@@ -64,6 +64,11 @@ type item struct {
 // How many screened tokens the health report keeps, newest last in storage.
 const dexRecent = 200
 
+// maxDexAttempts is how many DexScreener answers one token keeps. An empty
+// answer is asked again until a cap arrives, so an uncapped list grows for
+// as long as the bot runs.
+const maxDexAttempts = 8
+
 // DexAttempt is one DexScreener answer for a token. N starts at 1: the check
 // After after the token was created. The next numbers are retries.
 type DexAttempt struct {
@@ -261,6 +266,11 @@ func (g *Gate) record(it *item, att DexAttempt, decision, why string) {
 	if st.tok.Symbol == "" {
 		st.tok.Symbol = it.token.Symbol
 	}
+	if len(st.tok.Attempts) >= maxDexAttempts {
+		kept := make([]DexAttempt, maxDexAttempts-1, maxDexAttempts)
+		copy(kept, st.tok.Attempts[len(st.tok.Attempts)-(maxDexAttempts-1):])
+		st.tok.Attempts = kept
+	}
 	st.tok.Attempts = append(st.tok.Attempts, att)
 	g.dexSum.Requests++
 	if att.CapKnown && !st.sawCap {
@@ -289,11 +299,13 @@ func (g *Gate) record(it *item, att DexAttempt, decision, why string) {
 	}
 	for len(g.dexOrd) > dexRecent {
 		old := g.dexOrd[0]
-		if st := g.dex[old]; st != nil && !st.done {
-			break
-		}
 		delete(g.dex, old)
 		g.dexOrd = g.dexOrd[1:]
+	}
+	if cap(g.dexOrd) > dexRecent*2 {
+		fresh := make([]string, len(g.dexOrd))
+		copy(fresh, g.dexOrd)
+		g.dexOrd = fresh
 	}
 }
 
@@ -350,6 +362,7 @@ func (g *Gate) Recheck(ctx context.Context, book Book) {
 
 func (g *Gate) recheck(ctx context.Context, book Book) {
 	tokens := book.VolumeTokens()
+	g.forgetVolume(tokens)
 	limit := g.q.Limit()
 	if limit < 1 {
 		limit = len(tokens)
@@ -389,6 +402,22 @@ func (g *Gate) recheck(ctx context.Context, book Book) {
 			g.judgeVolume(book, byMint[mint], q.VolumeUSD)
 		}
 	}
+}
+
+// forgetVolume drops samples for tokens that left tiers 1–3. Release already
+// removes a token dropped for flat volume; expiry and an alert do not.
+func (g *Gate) forgetVolume(live []domain.Token) {
+	keep := make(map[string]struct{}, len(live))
+	for _, tok := range live {
+		keep[tok.Mint] = struct{}{}
+	}
+	g.mu.Lock()
+	for mint := range g.vol {
+		if _, ok := keep[mint]; !ok {
+			delete(g.vol, mint)
+		}
+	}
+	g.mu.Unlock()
 }
 
 // judgeVolume records one successful 24h volume. The first sample is only a

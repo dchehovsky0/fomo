@@ -127,6 +127,10 @@ type Watcher struct {
 	now      func() time.Time
 	Stats    Stats
 	perAcc   []atomic.Int64
+	// gap spaces only the first check of tokens that arrive together.
+	// Later checks keep the tier interval, so a 2s tier stays 2s.
+	gap   time.Duration
+	phase int
 
 	mu     sync.Mutex
 	items  map[string]*item
@@ -152,8 +156,23 @@ func New(cfg Config, accounts []Account, n Notifier, st Store, log *slog.Logger)
 	return &Watcher{
 		cfg: cfg, accounts: accounts, notifier: n, store: st, log: log, now: time.Now,
 		perAcc: make([]atomic.Int64, len(accounts)),
+		gap:    queueGap(cfg.Schedule),
 		items:  map[string]*item{}, wake: make(chan struct{}, 1),
 	}
+}
+
+// queueGap spreads a wave without stretching one token's own tier interval.
+// The cap is 200ms: a short tier (2s) still starts several tokens inside its
+// period, just not in the same instant. A test interval of a few milliseconds
+// keeps a smaller gap so the token's next check is not pushed back.
+func queueGap(schedule []Tier) time.Duration {
+	gap := 200 * time.Millisecond
+	for _, t := range schedule {
+		if t.Every > 0 && t.Every/2 < gap {
+			gap = t.Every / 2
+		}
+	}
+	return gap
 }
 
 // Add starts watching a launch; the first check is due immediately.
@@ -186,7 +205,7 @@ func (w *Watcher) Add(l domain.Token) {
 			"token", l.Mint, "ticker", l.Symbol)
 		return
 	}
-	it.due = w.now()
+	it.due = w.firstDue(w.now())
 	w.items[l.Mint] = it
 	heap.Push(&w.queue, it)
 	w.mu.Unlock()
@@ -223,7 +242,7 @@ func (w *Watcher) Release(mint string) bool {
 		heap.Remove(&w.queue, it.idx)
 	}
 	w.mu.Unlock()
-	w.noteTier(it, w.now())
+	// A token dropped for flat volume does not move to the next tier.
 	w.markStatus(mint, "dropped", w.now())
 	return true
 }
@@ -320,9 +339,30 @@ func (w *Watcher) reschedule(it *item, due time.Time) {
 		return
 	}
 	it.due = due
-	heap.Push(&w.queue, it)
+	if it.idx >= 0 {
+		heap.Fix(&w.queue, it.idx)
+	} else {
+		heap.Push(&w.queue, it)
+	}
 	w.mu.Unlock()
 	w.poke()
+}
+
+// firstDue staggers tokens that enter on the same wave. The offset stays
+// inside the first tier's interval, and later checks are not moved by it.
+// The caller holds w.mu.
+func (w *Watcher) firstDue(now time.Time) time.Time {
+	every := w.interval(0)
+	if every <= 0 || w.gap <= 0 {
+		return now
+	}
+	slots := int(every / w.gap)
+	if slots < 1 {
+		slots = 1
+	}
+	off := time.Duration(w.phase%slots) * w.gap
+	w.phase++
+	return now.Add(off)
 }
 
 func (w *Watcher) drop(it *item) {
@@ -365,6 +405,7 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	started := time.Now()
 	page, err := w.accounts[acc].Client.SortedThesis(ctx, it.l.Mint, it.l.CreatedAt.Add(-time.Minute), now.Add(time.Minute), w.cfg.ThesisLimit)
 	took := time.Since(started)
+	finished := w.now()
 	w.Stats.CheckNanos.Add(int64(took))
 	w.Stats.CheckSamples.Add(1)
 	if err != nil {
@@ -378,20 +419,22 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 			w.Stats.AuthErrors.Add(1)
 			w.miss(it, "auth", started, time.Now())
 			w.logCheck(acc, it, took, lag, "auth", it.count, w.cfg.AuthPause, err, nil)
-			w.noteTier(it, now)
-			w.reschedule(it, now)
+			w.noteTier(it, finished)
+			w.reschedule(it, finished)
 			return w.cfg.AuthPause, err
 		case fomo.Retryable(err):
 			w.miss(it, "retry", started, time.Now())
 			w.logCheck(acc, it, took, lag, "retry", it.count, w.cfg.RetryDelay, err, nil)
-			w.noteTier(it, now)
-			w.reschedule(it, now)
+			w.noteTier(it, finished)
+			// Not immediately: the tier interval is the soonest this token is
+			// asked again. An immediate handoff let every account hit it at once.
+			w.reschedule(it, nextDue(now, finished, w.interval(w.inWork(it, finished))))
 			return w.cfg.RetryDelay, err
 		}
 		w.miss(it, "error", started, later(time.Now(), started.Add(w.cfg.RetryDelay)))
 		w.logCheck(acc, it, took, lag, "error", it.count, w.cfg.RetryDelay, err, nil)
-		w.noteTier(it, now)
-		w.reschedule(it, now.Add(w.cfg.RetryDelay))
+		w.noteTier(it, finished)
+		w.reschedule(it, finished.Add(w.cfg.RetryDelay))
 		return 0, nil
 	}
 	w.Stats.Checks.Add(1)
@@ -405,7 +448,7 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 
 	if seenN >= w.cfg.MinTheses {
 		w.logCheck(acc, it, took, lag, "threshold", seenN, 0, nil, page)
-		w.signal(ctx, it, page, now, it.due, started, seen, took)
+		w.signal(ctx, it, page, finished, it.due, started, seen, took)
 		return 0, nil
 	}
 	it.sawBelow = true
@@ -414,24 +457,39 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	it.fails = 0
 	it.failKind = ""
 	it.failSpans = nil
-	next := now.Add(w.interval(w.inWork(it, now)))
+	every := w.interval(w.inWork(it, finished))
+	next := nextDue(now, finished, every)
 	if w.cfg.Lifetime > 0 && next.After(end) {
-		if !end.After(now) {
+		if !end.After(finished) {
 			w.Stats.Expired.Add(1)
 			w.drop(it)
-			w.noteTier(it, now)
-			w.markStatus(it.l.Mint, "expired", now)
+			w.noteTier(it, finished)
+			w.markStatus(it.l.Mint, "expired", finished)
 			w.logCheck(acc, it, took, lag, "expired", seenN, 0, nil, page)
 			return 0, nil
 		}
 		next = end // one last look right at the end of the lifetime
 	}
 	it.scheduledDue = next
-	it.every = next.Sub(now)
-	w.logCheck(acc, it, took, lag, "below", seenN, next.Sub(now), nil, page)
-	w.noteTier(it, now)
+	it.every = next.Sub(finished)
+	w.logCheck(acc, it, took, lag, "below", seenN, next.Sub(finished), nil, page)
+	w.noteTier(it, finished)
 	w.reschedule(it, next)
 	return 0, nil
+}
+
+// nextDue is one poll period after the check started. A check that already
+// lasted longer than its tier interval would otherwise be put back on the
+// queue as already due, and the next free account would take it at once.
+func nextDue(started, finished time.Time, every time.Duration) time.Time {
+	if every <= 0 {
+		every = time.Minute
+	}
+	next := started.Add(every)
+	if !next.After(finished) {
+		return finished.Add(every)
+	}
+	return next
 }
 
 func (w *Watcher) logCheck(acc int, it *item, took, lag time.Duration, result string, count int, next time.Duration, err error, page *fomo.TokenThesisPage) {

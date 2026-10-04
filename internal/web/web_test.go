@@ -12,6 +12,24 @@ import (
 	"fomobot/internal/notify"
 )
 
+func TestResources(t *testing.T) {
+	h := Resources()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health/resources", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"goroutines"`) || !strings.Contains(body, `"heap_inuse"`) || !strings.Contains(body, `"cpu_seconds"`) {
+		t.Fatalf("body %s", body)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health/resources", nil))
+	if !strings.Contains(rec.Body.String(), `"cpu_percent_recent"`) {
+		t.Fatalf("second body %s", rec.Body.String())
+	}
+}
+
 func TestAdminAccess(t *testing.T) {
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("secret report")) })

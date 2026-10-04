@@ -159,6 +159,9 @@ web:
   # market cap and volume for each screened token (?probe=1 checks accounts now).
   # GET /health/alerts: why an alert left later than the thesis that crossed
   # the threshold (previous fomo answer, queue lag, assembly, Telegram).
+  # GET /health/resources: memory, goroutines and CPU of this process.
+  # cpu_percent is the average since start. cpu_percent_recent appears on the
+  # second request and covers the time since the previous one.
   # Local run: open from this computer, no token. With public_url: required.
   admin_token: "${FOMO_ADMIN_TOKEN}"
 

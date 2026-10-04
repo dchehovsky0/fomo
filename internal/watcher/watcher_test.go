@@ -310,6 +310,88 @@ func TestStopDoesNotRespinDueTokens(t *testing.T) {
 	}
 }
 
+type jumpClock struct {
+	fakeFomo
+	advance func()
+}
+
+func (j *jumpClock) SortedThesis(ctx context.Context, mint string, after, before time.Time, limit int) (*fomo.TokenThesisPage, error) {
+	if j.advance != nil {
+		j.advance()
+	}
+	return j.fakeFomo.SortedThesis(ctx, mint, after, before, limit)
+}
+
+func TestLateCheckWaitsFullInterval(t *testing.T) {
+	st, _ := store.Open("")
+	base := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	var now atomic.Int64
+	now.Store(base.UnixNano())
+	f := &jumpClock{fakeFomo: fakeFomo{counts: map[string]int{"M": 0}}, advance: func() {
+		now.Store(base.Add(5 * time.Second).UnixNano())
+	}}
+	cfg := testConfig()
+	cfg.Schedule = []Tier{{MaxAge: time.Hour, Every: 2 * time.Second}}
+	w := New(cfg, []Account{{Name: "a", Client: f}}, &fakeNotifier{}, st, quiet())
+	w.now = func() time.Time { return time.Unix(0, now.Load()).UTC() }
+	it := &item{l: domain.Token{Mint: "M", Symbol: "S", CreatedAt: base}, due: base, addedAt: base, idx: -1}
+	w.items[it.l.Mint] = it
+	if _, err := w.check(context.Background(), 0, it); err != nil {
+		t.Fatal(err)
+	}
+	want := base.Add(7 * time.Second)
+	if !it.due.Equal(want) {
+		t.Fatalf("due = %s, want %s", it.due, want)
+	}
+}
+
+func TestFastCheckStaysOnTheTierInterval(t *testing.T) {
+	st, _ := store.Open("")
+	base := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	f := &fakeFomo{counts: map[string]int{"M": 1}}
+	cfg := testConfig()
+	cfg.Schedule = []Tier{{MaxAge: time.Hour, Every: 2 * time.Second}}
+	w := New(cfg, []Account{{Name: "a", Client: f}}, &fakeNotifier{}, st, quiet())
+	w.now = func() time.Time { return base }
+	it := &item{l: domain.Token{Mint: "M", Symbol: "S", CreatedAt: base}, due: base, addedAt: base, idx: -1}
+	w.items[it.l.Mint] = it
+	if _, err := w.check(context.Background(), 0, it); err != nil {
+		t.Fatal(err)
+	}
+	if !it.due.Equal(base.Add(2 * time.Second)) {
+		t.Fatalf("due = %s, want the 2s tier and no later", it.due)
+	}
+
+	f.err = errors.New("proxyconnect tcp: connection refused")
+	it.due = base
+	it.idx = -1
+	if _, err := w.check(context.Background(), 0, it); err == nil {
+		t.Fatal("expected retryable error")
+	}
+	if !it.due.Equal(base.Add(2 * time.Second)) {
+		t.Fatalf("retry due = %s, want the tier interval, not an immediate extra request", it.due)
+	}
+}
+
+func TestWaveIsNotDueTogether(t *testing.T) {
+	st, _ := store.Open("")
+	now := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	cfg := testConfig()
+	cfg.Schedule = []Tier{{MaxAge: time.Hour, Every: 2 * time.Second}}
+	w := New(cfg, nil, nil, st, quiet())
+	w.now = func() time.Time { return now }
+	for _, mint := range []string{"a", "b", "c"} {
+		w.Add(domain.Token{Mint: mint, CreatedAt: now})
+	}
+	var dues []time.Time
+	for _, mint := range []string{"a", "b", "c"} {
+		dues = append(dues, w.items[mint].due)
+	}
+	if !dues[0].Equal(now) || !dues[1].Equal(now.Add(200*time.Millisecond)) || !dues[2].Equal(now.Add(400*time.Millisecond)) {
+		t.Fatalf("dues = %v, a tier wave must not be due at one moment", dues)
+	}
+}
+
 func TestVolumeTokensLeaveAfterTier3(t *testing.T) {
 	st, _ := store.Open("")
 	cfg := testConfig()
@@ -420,6 +502,21 @@ func TestTierHistoryFollowsTheSchedule(t *testing.T) {
 	}
 	if _, steps, _ = book.snapshot(); strings.Join(ints(steps), ",") != "1,2,3,4" {
 		t.Fatalf("drop must keep tier history %v", steps)
+	}
+
+	young := &memTiers{}
+	w.SetTiers(young)
+	w.now = func() time.Time { return now }
+	w.Add(domain.Token{Mint: "FLAT", CreatedAt: now})
+	w.mu.Lock()
+	w.items["FLAT"].addedAt = now.Add(-25 * time.Minute)
+	w.mu.Unlock()
+	if !w.Release("FLAT") {
+		t.Fatal("release flat")
+	}
+	tier, steps, status = young.snapshot()
+	if tier != 1 || status != "dropped" || strings.Join(ints(steps), ",") != "1" {
+		t.Fatalf("dropped token advanced: tier=%d status=%s steps=%v", tier, status, steps)
 	}
 
 	again := &memTiers{tier: 4, status: "dropped", steps: []int{1, 2, 3, 4}, entered: now.Add(-2 * time.Hour)}

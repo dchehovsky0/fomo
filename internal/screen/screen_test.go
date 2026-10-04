@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"strconv"
 	"testing"
 	"time"
 
@@ -155,6 +156,43 @@ func (b *memBook) Release(mint string) bool {
 		}
 	}
 	return false
+}
+
+func TestDexHistoryStaysBounded(t *testing.T) {
+	g := New(Config{MinMarketCap: 7000}, &fakeQ{limit: 10}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	it := &item{token: domain.Token{Mint: "spin"}}
+	for n := 1; n <= 30; n++ {
+		g.record(it, DexAttempt{N: n}, "", "")
+	}
+	got := g.dex["spin"].tok.Attempts
+	if len(got) != maxDexAttempts || got[0].N != 30-maxDexAttempts+1 || got[len(got)-1].N != 30 {
+		t.Fatalf("attempts = %+v", got)
+	}
+	for i := 0; i < dexRecent+25; i++ {
+		g.record(&item{token: domain.Token{Mint: strconv.Itoa(i)}}, DexAttempt{N: 1}, "", "")
+	}
+	if len(g.dex) != dexRecent || len(g.dexOrd) != dexRecent {
+		t.Fatalf("dex=%d ord=%d", len(g.dex), len(g.dexOrd))
+	}
+}
+
+func TestVolumeTrackLeavesWhenTokenLeavesTiers(t *testing.T) {
+	q := &fakeQ{limit: 10, quotes: map[string]dexscreener.Quote{
+		"stay": {VolumeUSD: 10, VolumeKnown: true},
+		"gone": {VolumeUSD: 10, VolumeKnown: true},
+	}}
+	g := New(Config{MinMarketCap: 7000, MinGrowth: 0.05}, q, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	book := &memBook{tokens: []domain.Token{{Mint: "stay"}, {Mint: "gone"}}}
+	g.recheck(context.Background(), book)
+	book.tokens = []domain.Token{{Mint: "stay"}}
+	g.recheck(context.Background(), book)
+	g.mu.Lock()
+	_, stay := g.vol["stay"]
+	_, gone := g.vol["gone"]
+	g.mu.Unlock()
+	if !stay || gone {
+		t.Fatalf("stay=%v gone=%v", stay, gone)
+	}
 }
 
 func TestVolumeNeedsTwoFlatSamples(t *testing.T) {

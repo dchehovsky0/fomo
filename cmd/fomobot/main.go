@@ -136,6 +136,7 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 		}
 		pagesSink = pages
 		pages.HandleAdmin("GET /health/accounts", health.Handler())
+		pages.HandleAdmin("GET /health/resources", web.Resources())
 	}
 
 	var notifier watcher.Notifier
@@ -226,6 +227,7 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 	wg.Go(func() { health.Run(ctx, healthEvery, healthIdleAfter) })
 	if pages != nil {
 		log.Info("fomo accounts status", "url", healthURL(cfg))
+		log.Info("process resources", "url", strings.TrimSuffix(healthURL(cfg), "/accounts")+"/resources")
 		wg.Go(func() {
 			if err := pages.Run(ctx, webListen(cfg)); err != nil && ctx.Err() == nil {
 				log.Error("theses pages server stopped", "err", err)
