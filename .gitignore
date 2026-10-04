@@ -1,0 +1,14 @@
+.env
+token.txt
+proxies.txt
+chrome-profile/
+profiles/
+axiom-profile/
+.axiom-chrome-profile/
+data/
+logs/
+bin/
+*.exe
+__MACOSX/
+.idea/
+axiom-solana-stream/

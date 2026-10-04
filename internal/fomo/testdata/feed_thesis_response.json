@@ -1,0 +1,614 @@
+{
+ "success": true,
+ "message": "Feeds retrieved successfully",
+ "responseObject": {
+  "feed": [
+   {
+    "id": "a1fab617-7e1a-4a88-8f8f-51b3f5852bdf",
+    "userId": "8fc6597c-832b-5081-b6dc-d9be60699491",
+    "tradeId": "d82d89b5-1e46-4785-bb5f-2b71aa5e11e2",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+    "networkId": 1399811149,
+    "createdAt": "2026-09-26T13:41:10.000Z",
+    "body": {
+     "fdv": 17560600,
+     "tag": null,
+     "price": 0.0178569309182,
+     "ticker": "e/acc",
+     "userId": "8fc6597c-832b-5081-b6dc-d9be60699491",
+     "comment": "Now UP WE GO... !!!\nThis is THE PROJECT",
+     "commentId": "t2-77713238c073543bedc99b03c98b9f75d7615286dcc49aa0967c8aa79393f185-c511f120",
+     "marketCap": 17560600,
+     "networkId": 1399811149,
+     "userHandle": "Binnje941",
+     "displayName": "Binnje941",
+     "tokenAddress": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+     "userImageUrl": "https://prod-fomo-profile-pics.s3.amazonaws.com/40cae3df8dc6bda5d4705640f573af6f_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+     "fdvAtCreation": 14839431.01001936,
+     "tokenImageUrl": "https://token-media.defined.fi/1399811149_CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU_small_1f6bde0fab65.png",
+     "realizedPnlUsd": 1742.23,
+     "humanTokenAmount": 1969572.4,
+     "unrealizedPnlUsd": 32723.77,
+     "priceUsdAtCreation": 0.0150898843606,
+     "marketCapAtCreation": 14839431.01001936,
+     "positionNotionalUsd": 35170.52,
+     "percentageRealizedPnl": 741.972,
+     "percentageUnrealizedPnl": 1337.44,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "Now UP WE GO... !!!\nThis is THE PROJECT",
+       "link": null,
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-77713238c073543bedc99b03c98b9f75d7615286dcc49aa0967c8aa79393f185-c511f120",
+     "userId": "8fc6597c-832b-5081-b6dc-d9be60699491",
+     "tradeId": "d82d89b5-1e46-4785-bb5f-2b71aa5e11e2",
+     "comment": "Now UP WE GO... !!!\nThis is THE PROJECT",
+     "priceUsdAtCreation": 0.0150898843606,
+     "marketCapAtCreation": 14839431.01001936,
+     "fdvAtCreation": 14839431.01001936,
+     "createdAt": "2026-09-26T13:41:11.290Z",
+     "parentId": null,
+     "numLikes": 0,
+     "tokenAddress": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+     "networkId": 1399811149,
+     "reactions": {
+      "counts": {
+       "likeCount": 0
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 31,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   },
+   {
+    "id": "52b73687-7fc5-485b-b0dc-cab653b9a47a",
+    "userId": "3a703fe5-8d07-520e-bc93-0ca79a9a1cc6",
+    "tradeId": "483ab557-3f23-446c-b992-1df04966a1d4",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "0x6249519883b8d7ccf915dfcd6c0442984dae9d24",
+    "networkId": 4663,
+    "createdAt": "2026-09-26T13:41:00.000Z",
+    "body": {
+     "fdv": 6248450,
+     "tag": null,
+     "price": 0.00651471032783,
+     "ticker": "CASHED",
+     "userId": "3a703fe5-8d07-520e-bc93-0ca79a9a1cc6",
+     "comment": "CASHED devs are DOUBLE GOLD verified on X, they are innovative as shit, this sees 200mil+ this cycle",
+     "commentId": "t2-307bbeeff4705cccc13273691a83248d2f55534942318f938d8457c7f18704fc-67fbad13",
+     "marketCap": 6025870,
+     "networkId": 4663,
+     "userHandle": "Mr_Krafty_",
+     "displayName": "Krafty",
+     "tokenAddress": "0x6249519883b8d7ccf915dfcd6c0442984dae9d24",
+     "userImageUrl": "https://prod-fomo-profile-pics.s3.amazonaws.com/e6eb923763156f0af7b7a90fde3ab20b_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+     "fdvAtCreation": 5301725.202223461,
+     "tokenImageUrl": "https://token-media.defined.fi/4663_0x6249519883b8d7ccf915dfcd6c0442984dae9d24_small_abeccc7c0a94.png",
+     "realizedPnlUsd": -1764.9,
+     "humanTokenAmount": 1744642.67,
+     "unrealizedPnlUsd": 9739.68,
+     "priceUsdAtCreation": 0.00552764482078,
+     "marketCapAtCreation": 5112869.512361683,
+     "positionNotionalUsd": 11365.84,
+     "percentageRealizedPnl": -42.7429,
+     "percentageUnrealizedPnl": 598.937,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "CASHED devs are DOUBLE GOLD verified on X, they are innovative as shit, this sees 200mil+ this cycle",
+       "link": null,
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-307bbeeff4705cccc13273691a83248d2f55534942318f938d8457c7f18704fc-67fbad13",
+     "userId": "3a703fe5-8d07-520e-bc93-0ca79a9a1cc6",
+     "tradeId": "483ab557-3f23-446c-b992-1df04966a1d4",
+     "comment": "CASHED devs are DOUBLE GOLD verified on X, they are innovative as shit, this sees 200mil+ this cycle",
+     "priceUsdAtCreation": 0.00552764482078,
+     "marketCapAtCreation": 5112869.512361683,
+     "fdvAtCreation": 5301725.202223461,
+     "createdAt": "2026-09-26T13:41:01.977Z",
+     "parentId": null,
+     "numLikes": 0,
+     "tokenAddress": "0x6249519883b8d7ccf915dfcd6c0442984dae9d24",
+     "networkId": 4663,
+     "reactions": {
+      "counts": {
+       "likeCount": 0
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 13,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   },
+   {
+    "id": "dae0f069-cbc9-4bf2-9ae7-098dc8b60c88",
+    "userId": "f19cfe9a-24a0-5ba3-bfab-792e1b91ed26",
+    "tradeId": "a4306fdd-4571-4599-9f2a-cdf4364198c3",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "GKeUT73KRsvWVYNfQPdghxdHTKKGUAESf3t8BZmfXvih",
+    "networkId": 1399811149,
+    "createdAt": "2026-09-26T13:40:55.000Z",
+    "body": {
+     "fdv": 2378460,
+     "tag": null,
+     "price": 0.00237881531106,
+     "ticker": "GROK",
+     "userId": "f19cfe9a-24a0-5ba3-bfab-792e1b91ed26",
+     "comment": "go engage here \nhttps://x.com/dezpill/status/2103841963414024429",
+     "commentId": "t2-b5e937a85e7414759032d6099c54576bfc6c67c1ac2aaf74e350a33da3d1de19-506fadd9",
+     "marketCap": 2378460,
+     "networkId": 1399811149,
+     "userHandle": "dezpill",
+     "displayName": "dez",
+     "tokenAddress": "GKeUT73KRsvWVYNfQPdghxdHTKKGUAESf3t8BZmfXvih",
+     "userImageUrl": "https://prod-fomo-profile-pics.s3.amazonaws.com/5e7d5dd564ac67e0a119be321c92121b_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+     "fdvAtCreation": 2387374.9472233746,
+     "tokenImageUrl": "https://token-media.defined.fi/1399811149_GKeUT73KRsvWVYNfQPdghxdHTKKGUAESf3t8BZmfXvih_small_344d90953a9b.png",
+     "realizedPnlUsd": 19693.43,
+     "humanTokenAmount": 20000000,
+     "unrealizedPnlUsd": 38942.85,
+     "priceUsdAtCreation": 0.00238772999807,
+     "marketCapAtCreation": 2387374.9472233746,
+     "positionNotionalUsd": 47576.31,
+     "percentageRealizedPnl": 107.229,
+     "percentageUnrealizedPnl": 451.069,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "go engage here \n",
+       "link": null,
+       "provider": null
+      },
+      {
+       "text": "https://x.com/dezpill/status/2103841963414024429",
+       "link": "https://x.com/dezpill/status/2103841963414024429",
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-b5e937a85e7414759032d6099c54576bfc6c67c1ac2aaf74e350a33da3d1de19-506fadd9",
+     "userId": "f19cfe9a-24a0-5ba3-bfab-792e1b91ed26",
+     "tradeId": "a4306fdd-4571-4599-9f2a-cdf4364198c3",
+     "comment": "go engage here \nhttps://x.com/dezpill/status/2103841963414024429",
+     "priceUsdAtCreation": 0.00238772999807,
+     "marketCapAtCreation": 2387374.9472233746,
+     "fdvAtCreation": 2387374.9472233746,
+     "createdAt": "2026-09-26T13:40:55.461Z",
+     "parentId": null,
+     "numLikes": 0,
+     "tokenAddress": "GKeUT73KRsvWVYNfQPdghxdHTKKGUAESf3t8BZmfXvih",
+     "networkId": 1399811149,
+     "reactions": {
+      "counts": {
+       "likeCount": 0
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 79,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   },
+   {
+    "id": "37748c0f-8c4e-429a-a540-0a768343efa3",
+    "userId": "95dad577-4e15-53b8-8781-df0c836092f6",
+    "tradeId": "eba7fd50-8c40-4cc9-a2dc-ed423941f385",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "0xa26992c4268a8a78a4d872fe4bdad2ed03ac287d",
+    "networkId": 4663,
+    "createdAt": "2026-09-26T13:40:10.000Z",
+    "body": {
+     "fdv": 1985860,
+     "tag": null,
+     "price": 0.00198586269947,
+     "ticker": "MANY",
+     "userId": "95dad577-4e15-53b8-8781-df0c836092f6",
+     "comment": "Devs cooking",
+     "commentId": "t2-2248582eb35053543814620bff3a226016859497033021a9640c311697a97bd7-9028d1ca",
+     "marketCap": 1985860,
+     "networkId": 4663,
+     "userHandle": "slicedbread",
+     "displayName": "slicedbread",
+     "tokenAddress": "0xa26992c4268a8a78a4d872fe4bdad2ed03ac287d",
+     "userImageUrl": "https://prod-fomo-profile-pics.s3.amazonaws.com/4fe8c6ea0c966e7f3fa4bca521ddd4aa_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+     "fdvAtCreation": 1985932.32704,
+     "tokenImageUrl": "https://token-media.defined.fi/4663_0xa26992c4268a8a78a4d872fe4bdad2ed03ac287d_small_5ceb72eb7dae.png",
+     "realizedPnlUsd": 991.633,
+     "humanTokenAmount": 9393968.16,
+     "unrealizedPnlUsd": 7275.85,
+     "priceUsdAtCreation": 0.00198593232704,
+     "marketCapAtCreation": 1985932.32704,
+     "positionNotionalUsd": 18655.13,
+     "percentageRealizedPnl": 88.0834,
+     "percentageUnrealizedPnl": 63.9394,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "Devs cooking",
+       "link": null,
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-2248582eb35053543814620bff3a226016859497033021a9640c311697a97bd7-9028d1ca",
+     "userId": "95dad577-4e15-53b8-8781-df0c836092f6",
+     "tradeId": "eba7fd50-8c40-4cc9-a2dc-ed423941f385",
+     "comment": "Devs cooking",
+     "priceUsdAtCreation": 0.00198593232704,
+     "marketCapAtCreation": 1985932.32704,
+     "fdvAtCreation": 1985932.32704,
+     "createdAt": "2026-09-26T13:40:10.044Z",
+     "parentId": null,
+     "numLikes": 0,
+     "tokenAddress": "0xa26992c4268a8a78a4d872fe4bdad2ed03ac287d",
+     "networkId": 4663,
+     "reactions": {
+      "counts": {
+       "likeCount": 0
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 24,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   },
+   {
+    "id": "5dd0a923-95ba-40b9-be3d-211cf7dbc08c",
+    "userId": "f4844a0a-c9f1-50cf-aaae-38c9f5424567",
+    "tradeId": "d6df4fc5-6db2-45e0-bfb6-24205c64d03c",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
+    "networkId": 1399811149,
+    "createdAt": "2026-09-26T13:40:05.000Z",
+    "body": {
+     "fdv": 5166850,
+     "tag": null,
+     "price": 0.00532945446926,
+     "ticker": "JEANPHIL",
+     "userId": "f4844a0a-c9f1-50cf-aaae-38c9f5424567",
+     "comment": "After this Double Bottom is complete, say peace out to single digit $MC.",
+     "commentId": "t2-168a333946c21647c9072f46aa7e7a334efc4c16e600e16ed81bf26dcb230298-488ab419",
+     "marketCap": 5166850,
+     "networkId": 1399811149,
+     "userHandle": "TradBengal",
+     "displayName": "TradBengal",
+     "tokenAddress": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
+     "userImageUrl": "https://prod-fomo-profile-pics.s3.amazonaws.com/2cb416867cc265712c2759694fd1d40a_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+     "fdvAtCreation": 5255913.221089164,
+     "tokenImageUrl": "https://token-media.defined.fi/1399811149_GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump_small_8c8ef9636648.png",
+     "realizedPnlUsd": 218.462,
+     "humanTokenAmount": 6936197.07,
+     "unrealizedPnlUsd": 1911.33,
+     "priceUsdAtCreation": 0.00542131899073,
+     "marketCapAtCreation": 5255913.221089164,
+     "positionNotionalUsd": 36966.15,
+     "percentageRealizedPnl": 1.07371,
+     "percentageUnrealizedPnl": 5.45239,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "After this Double Bottom is complete, say peace out to single digit $MC.",
+       "link": null,
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-168a333946c21647c9072f46aa7e7a334efc4c16e600e16ed81bf26dcb230298-488ab419",
+     "userId": "f4844a0a-c9f1-50cf-aaae-38c9f5424567",
+     "tradeId": "d6df4fc5-6db2-45e0-bfb6-24205c64d03c",
+     "comment": "After this Double Bottom is complete, say peace out to single digit $MC.",
+     "priceUsdAtCreation": 0.00542131899073,
+     "marketCapAtCreation": 5255913.221089164,
+     "fdvAtCreation": 5255913.221089164,
+     "createdAt": "2026-09-26T13:40:08.544Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
+     "networkId": 1399811149,
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 15,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   },
+   {
+    "id": "af8a4ee5-eba9-4fbb-aee5-0fa1b77c50ad",
+    "userId": "9abfecb2-ff48-5f93-ad14-ec35f0297459",
+    "tradeId": "4c21f14b-3939-46bd-9677-d3e362280cf5",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+    "networkId": 1399811149,
+    "createdAt": "2026-09-26T13:39:40.000Z",
+    "body": {
+     "fdv": 91074700,
+     "tag": null,
+     "price": 0.0944389755655,
+     "ticker": "CATE",
+     "userId": "9abfecb2-ff48-5f93-ad14-ec35f0297459",
+     "comment": "All roads lead back to cate🐈💛😏",
+     "commentId": "t2-769cd851bc0ae0c968fc4c392dc83c70eea9f319f7ea16f0edc7eba7fbc2ba72-9569abbb",
+     "marketCap": 91074700,
+     "networkId": 1399811149,
+     "userHandle": "dontetrades",
+     "displayName": "dontetrades",
+     "tokenAddress": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+     "userImageUrl": "https://prod-fomo-profile-pics.s3.amazonaws.com/ed77bd1d3c2f236af1fc2badfdf2f648_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+     "fdvAtCreation": 90807726.81829168,
+     "tokenImageUrl": "https://token-media.defined.fi/1399811149_Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump_small_ca0d4b10f481.png",
+     "realizedPnlUsd": 2670.87,
+     "humanTokenAmount": 142525.06,
+     "unrealizedPnlUsd": 8674,
+     "priceUsdAtCreation": 0.0941621115384,
+     "marketCapAtCreation": 90807726.81829168,
+     "positionNotionalUsd": 13459.92,
+     "percentageRealizedPnl": 66.9965,
+     "percentageUnrealizedPnl": 181.24,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "All roads lead back to cate🐈💛😏",
+       "link": null,
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-769cd851bc0ae0c968fc4c392dc83c70eea9f319f7ea16f0edc7eba7fbc2ba72-9569abbb",
+     "userId": "9abfecb2-ff48-5f93-ad14-ec35f0297459",
+     "tradeId": "4c21f14b-3939-46bd-9677-d3e362280cf5",
+     "comment": "All roads lead back to cate🐈💛😏",
+     "priceUsdAtCreation": 0.0941621115384,
+     "marketCapAtCreation": 90807726.81829168,
+     "fdvAtCreation": 90807726.81829168,
+     "createdAt": "2026-09-26T13:39:44.028Z",
+     "parentId": null,
+     "numLikes": 0,
+     "tokenAddress": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+     "networkId": 1399811149,
+     "reactions": {
+      "counts": {
+       "likeCount": 0
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 485,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   },
+   {
+    "id": "98d049fc-46cf-42ee-8aa0-fc6c332bf03b",
+    "userId": "6737fd99-b8f8-5377-b914-87578d2e6759",
+    "tradeId": "a78b3d52-3b02-41f3-9819-2ad7cd1a4ffd",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+    "networkId": 1399811149,
+    "createdAt": "2026-09-26T13:39:35.000Z",
+    "body": {
+     "fdv": 17125500,
+     "tag": null,
+     "price": 0.0174145581174,
+     "ticker": "e/acc",
+     "userId": "6737fd99-b8f8-5377-b914-87578d2e6759",
+     "comment": "ACCELERATE🚀",
+     "commentId": "t2-0df366a0b442e840dfd98063d415328749aec098d2f28a3d597436147a6e4125-96fc7e0b",
+     "marketCap": 17125500,
+     "networkId": 1399811149,
+     "userHandle": "SovietInnocentPossum",
+     "displayName": "SovietInnocentPossum",
+     "tokenAddress": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+     "userImageUrl": null,
+     "fdvAtCreation": 14839431.01001936,
+     "tokenImageUrl": "https://token-media.defined.fi/1399811149_CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU_small_1f6bde0fab65.png",
+     "realizedPnlUsd": 4946.95,
+     "humanTokenAmount": 1053974.69,
+     "unrealizedPnlUsd": 17808.55,
+     "priceUsdAtCreation": 0.0150898843606,
+     "marketCapAtCreation": 14839431.01001936,
+     "positionNotionalUsd": 18354.5,
+     "percentageRealizedPnl": 2437.48,
+     "percentageUnrealizedPnl": 3261.93,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "ACCELERATE🚀",
+       "link": null,
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-0df366a0b442e840dfd98063d415328749aec098d2f28a3d597436147a6e4125-96fc7e0b",
+     "userId": "6737fd99-b8f8-5377-b914-87578d2e6759",
+     "tradeId": "a78b3d52-3b02-41f3-9819-2ad7cd1a4ffd",
+     "comment": "ACCELERATE🚀",
+     "priceUsdAtCreation": 0.0150898843606,
+     "marketCapAtCreation": 14839431.01001936,
+     "fdvAtCreation": 14839431.01001936,
+     "createdAt": "2026-09-26T13:39:34.994Z",
+     "parentId": null,
+     "numLikes": 4,
+     "tokenAddress": "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+     "networkId": 1399811149,
+     "reactions": {
+      "counts": {
+       "likeCount": 4
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 1,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   },
+   {
+    "id": "f5232707-5691-4da7-acec-90b6610bc3e3",
+    "userId": "f65d1afe-32ca-572b-bb8a-14cab54b9075",
+    "tradeId": "56a526d8-d153-4465-af0c-597022f6f208",
+    "swapId": null,
+    "transferId": null,
+    "tokenAddress": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+    "networkId": 1399811149,
+    "createdAt": "2026-09-26T13:39:00.000Z",
+    "body": {
+     "fdv": 91029000,
+     "tag": null,
+     "price": 0.0943915716252,
+     "ticker": "CATE",
+     "userId": "f65d1afe-32ca-572b-bb8a-14cab54b9075",
+     "comment": "Moon soon 1000x",
+     "commentId": "t2-d24d3fa1d496c1872b1bd126ecc4f3a14c17c23ad3c8d0c39e1efa7fbdf5f392-9df65c46",
+     "marketCap": 91029000,
+     "networkId": 1399811149,
+     "userHandle": "DotKek69420",
+     "displayName": "Sossa Dot KeK😼",
+     "tokenAddress": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+     "userImageUrl": "https://prod-fomo-profile-pics.s3.amazonaws.com/5b2979df8566fcb7f4af66db856c44f1_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+     "fdvAtCreation": 90807726.81829168,
+     "tokenImageUrl": "https://token-media.defined.fi/1399811149_Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump_small_ca0d4b10f481.png",
+     "realizedPnlUsd": 0,
+     "humanTokenAmount": 526597.14,
+     "unrealizedPnlUsd": -10497.94,
+     "priceUsdAtCreation": 0.0941621115384,
+     "marketCapAtCreation": 90807726.81829168,
+     "positionNotionalUsd": 49706.33,
+     "percentageRealizedPnl": 0,
+     "percentageUnrealizedPnl": -17.4372,
+     "isDev": false,
+     "shortCommentSegments": [
+      {
+       "text": "Moon soon 1000x",
+       "link": null,
+       "provider": null
+      }
+     ]
+    },
+    "verified": false,
+    "likes": 0,
+    "views": 0,
+    "type": "thesis_created",
+    "pinned": false,
+    "tradeComment": {
+     "id": "t2-d24d3fa1d496c1872b1bd126ecc4f3a14c17c23ad3c8d0c39e1efa7fbdf5f392-9df65c46",
+     "userId": "f65d1afe-32ca-572b-bb8a-14cab54b9075",
+     "tradeId": "56a526d8-d153-4465-af0c-597022f6f208",
+     "comment": "Moon soon 1000x",
+     "priceUsdAtCreation": 0.0941621115384,
+     "marketCapAtCreation": 90807726.81829168,
+     "fdvAtCreation": 90807726.81829168,
+     "createdAt": "2026-09-26T13:39:03.517Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+     "networkId": 1399811149,
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 13,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "twitter": null,
+    "reacted": false
+   }
+  ]
+ },
+ "statusCode": 200
+}

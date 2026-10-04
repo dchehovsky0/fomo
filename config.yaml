@@ -1,0 +1,198 @@
+﻿fomo:
+  base_url: https://prod-api.fomo.family
+  app_url: https://fomo.family/
+  supported_chains: "1,56,143,4663,5042,8453,1399811149"
+  network_id: "1399811149"      # Solana
+  feed_limit: 50                # -record mode
+  # For API requests. Copy the real one from your browser (DevTools → Network → any
+  # request → User-Agent). Headless Chrome (session.mode=chromedp) uses its own.
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+  request_timeout: 10s
+  rate_limit_rps: 1             # per account, unless the account sets its own rps
+  max_retries: 5
+  # "threshold" of /feed/token/thesis (-record mode).
+  thesis_threshold: "0"
+
+session:
+  mode: chromedp                  # static | chromedp
+  # chromedp: each account is a Chrome you start yourself, with its own profile
+  # and --remote-debugging-port. The bot attaches. It does not launch Chrome
+  # and it does not refresh Privy. Log in with `fomobot -login -account acc01`
+  # (Google sign-in has no debug port), then reopen that profile with the port
+  # and leave the window open.
+  # static: token copied from localStorage["privy:token"].
+  chrome_path: "${FOMO_CHROME_PATH}"
+  headless: true
+  no_sandbox: ${FOMO_CHROME_NO_SANDBOX}
+  refresh_before_expiry: 5m
+  page_load_timeout: 60s
+  chrome_concurrency: 4
+  # Used only when the accounts list below is empty.
+  access_token: "${FOMO_ACCESS_TOKEN}"
+  token_file: ./token.txt
+  chrome_profile_dir: ./profiles/acc01
+
+# Twenty-three Fomo accounts, the same shape as fomo-thesis-tester.
+# acc01 -> 9221 ... acc23 -> 9243.
+# API calls run inside the open fomo.family tab, so these accounts do not use
+# the Go proxy. Which accounts answer: GET /health/accounts.
+accounts:
+  - {name: acc01, chrome_profile_dir: ./profiles/acc01, debug_url: "http://127.0.0.1:9221", rps: 1, workers: 1}
+  - {name: acc02, chrome_profile_dir: ./profiles/acc02, debug_url: "http://127.0.0.1:9222", rps: 1, workers: 1}
+  - {name: acc03, chrome_profile_dir: ./profiles/acc03, debug_url: "http://127.0.0.1:9223", rps: 1, workers: 1}
+  - {name: acc04, chrome_profile_dir: ./profiles/acc04, debug_url: "http://127.0.0.1:9224", rps: 1, workers: 1}
+  - {name: acc05, chrome_profile_dir: ./profiles/acc05, debug_url: "http://127.0.0.1:9225", rps: 1, workers: 1}
+  - {name: acc06, chrome_profile_dir: ./profiles/acc06, debug_url: "http://127.0.0.1:9226", rps: 1, workers: 1}
+  - {name: acc07, chrome_profile_dir: ./profiles/acc07, debug_url: "http://127.0.0.1:9227", rps: 1, workers: 1}
+  - {name: acc08, chrome_profile_dir: ./profiles/acc08, debug_url: "http://127.0.0.1:9228", rps: 1, workers: 1}
+  - {name: acc09, chrome_profile_dir: ./profiles/acc09, debug_url: "http://127.0.0.1:9229", rps: 1, workers: 1}
+  - {name: acc10, chrome_profile_dir: ./profiles/acc10, debug_url: "http://127.0.0.1:9230", rps: 1, workers: 1}
+  - {name: acc11, chrome_profile_dir: ./profiles/acc11, debug_url: "http://127.0.0.1:9231", rps: 1, workers: 1}
+  - {name: acc12, chrome_profile_dir: ./profiles/acc12, debug_url: "http://127.0.0.1:9232", rps: 1, workers: 1}
+  - {name: acc13, chrome_profile_dir: ./profiles/acc13, debug_url: "http://127.0.0.1:9233", rps: 1, workers: 1}
+  - {name: acc14, chrome_profile_dir: ./profiles/acc14, debug_url: "http://127.0.0.1:9234", rps: 1, workers: 1}
+  - {name: acc15, chrome_profile_dir: ./profiles/acc15, debug_url: "http://127.0.0.1:9235", rps: 1, workers: 1}
+  - {name: acc16, chrome_profile_dir: ./profiles/acc16, debug_url: "http://127.0.0.1:9236", rps: 1, workers: 1}
+  - {name: acc17, chrome_profile_dir: ./profiles/acc17, debug_url: "http://127.0.0.1:9237", rps: 1, workers: 1}
+  - {name: acc18, chrome_profile_dir: ./profiles/acc18, debug_url: "http://127.0.0.1:9238", rps: 1, workers: 1}
+  # - {name: acc19, chrome_profile_dir: ./profiles/acc19, debug_url: "http://127.0.0.1:9239", rps: 1, workers: 1}
+  # - {name: acc20, chrome_profile_dir: ./profiles/acc20, debug_url: "http://127.0.0.1:9240", rps: 1, workers: 1}
+  # - {name: acc21, chrome_profile_dir: ./profiles/acc21, debug_url: "http://127.0.0.1:9241", rps: 1, workers: 1}
+  # - {name: acc22, chrome_profile_dir: ./profiles/acc22, debug_url: "http://127.0.0.1:9242", rps: 1, workers: 1}
+  # - {name: acc23, chrome_profile_dir: ./profiles/acc23, debug_url: "http://127.0.0.1:9243", rps: 1, workers: 1}
+
+# New tokens: Axiom's real-time new_pairs stream (WebSocket), read by a Chrome
+# kept open on axiom.trade. Real time only: tokens launched while the bot is
+# down are not picked up later.
+# Session: log in once with `fomobot -axiom-login` (bot stopped), or put the
+# cookies from DevTools → Application → Cookies → axiom.trade into .env.
+# After that the site refreshes them itself inside the profile.
+axiom:
+  app_url: https://axiom.trade/
+  clusters:                     # tried in turn on every reconnect
+    - wss://cluster9.axiom.trade/
+    - wss://cluster3.axiom.trade/
+    - wss://cluster5.axiom.trade/
+    - wss://cluster7.axiom.trade/
+  chrome_profile_dir: ./axiom-profile   # not one of the fomo account profiles
+  headless: false               # true on a server without a screen, if Cloudflare lets it in
+  access_token: "${AXIOM_ACCESS_TOKEN}"
+  refresh_token: "${AXIOM_REFRESH_TOKEN}"
+  cf_clearance: "${CF_CLEARANCE}"
+  # Only these protocols (Axiom's "protocol" or "display_protocol"), e.g.
+  # ["Pump V1"]. Empty = every protocol. The "axiom stats" log line shows
+  # how many pairs came per protocol.
+  protocols: []
+  # These never reach DexScreener, the fomo checks or any alert.
+  skip_protocols:
+    - Meteora AMM V2
+    - Meteora DLMM
+    - Raydium CLMM
+    - Orca
+    
+  stall_timeout: 3m             # no new pair for this long: restart Chrome
+  start_timeout: 90s            # opening axiom.trade (Cloudflare included)
+
+# Ten seconds after launch, ask DexScreener for market cap. Above
+# min_market_cap the token enters tier 1. Volume is not an entry filter.
+# An empty DexScreener answer is asked again; it does not drop the token.
+# Each proxy takes 30 addresses, so proxies.txt with 10 lines checks 300
+# tokens per wave. Lines are socks5://user:pass@host:port.
+# recheck: while the token is in tiers 1–3, volume.h24 is compared with the
+# previous sample. Growth under volume_min_growth is a bad sample. Two bad
+# samples in a row drop the token. An empty answer is not a sample.
+# Rules: TOKEN_TIERS.md.
+screen:
+  after: 10s
+  min_market_cap: 7000
+  recheck: 30s
+  volume_min_growth: 0.05
+  proxies: ./proxies.txt
+
+watch:
+  # From the moment the token enters tier 1: 20m + 30m + 1h + 48h.
+  lifetime: 49h50m
+  # DexScreener volume is checked only until tier 4, which starts at 1h50m.
+  volume_for: 110m
+  min_theses: 3                 # alert when the token has this many theses
+  thesis_limit: 500             # one sortedThesis page; 500 is the API cap so the window comes back whole
+  schedule:                     # age is time since tier 1, not since the token was created
+    - {max_age: 20m, every: 2s}
+    - {max_age: 50m, every: 5s}
+    - {max_age: 110m, every: 30s}
+    - {max_age: 49h50m, every: 2m}
+  retry_delay: 30s
+  auth_pause: 1m                # rest an account after fomo rejected its token
+  rate_window: 10m              # "theses per minute" in alerts = theses in this window / its minutes
+
+# Alert when a Solana token enters fomo's trending list (WebSocket, any working
+# fomo account). Info: rank, MC, 24h change/volume, holders,
+# theses count and authors, token age if it is a recent launchpad token.
+trending:
+  enabled: false
+  ws_url: wss://prod-api.fomo.family/ws
+  topic_id: "1,56,143,4663,5042,8453,1399811149"
+  realert_after: 24h            # announce again if it returns after this long out of trending (0s = once ever)
+  silent_first_snapshot: true   # first start ever: the current list is recorded without alerts
+
+telegram:
+  bot_token: "${TELEGRAM_BOT_TOKEN}"
+  chat_id: "${TELEGRAM_CHAT_ID}"
+  token_link_template: "https://fomo.family/tokens/solana/{mint}"
+  # {pair} = the token's main pool (DexScreener, most liquidity), {mint} = the token.
+  axiom_link_template: "https://axiom.trade/meme/{pair}?chain=sol&chains=sol,robinhood,bnb,base&pulseChains=sol,robinhood,bnb,base&trackerChains=sol,robinhood,bnb,base&discoverChains=sol,robinhood,bnb,base"
+  timezone: Europe/Moscow       # thesis times in alerts and on theses pages
+
+# The "📖 texts of the first theses" button opens a page served by the bot.
+# Local run: leave FOMO_PUBLIC_URL empty and pages open on this computer at
+# http://localhost:8080/t/... (the server listens on 127.0.0.1 only).
+# On a server: open the port and set FOMO_PUBLIC_URL, e.g.
+# http://<server-ip>:8080 or https://bot.example.com (reverse proxy).
+web:
+  enabled: true
+  listen: ":8080"
+  public_url: "${FOMO_PUBLIC_URL}"   # empty = http://localhost:8080, this computer only
+  pages_dir: ./data/pages
+  keep: 168h                    # pages are deleted after a week
+  # GET /health/accounts: which fomo accounts work, how many tokens are in
+  # the fomo checks right now ("watching"), plus how DexScreener answered
+  # market cap and volume for each screened token (?probe=1 checks accounts now).
+  # GET /health/alerts: why an alert left later than the thesis that crossed
+  # the threshold (previous fomo answer, queue lag, assembly, Telegram).
+  # Local run: open from this computer, no token. With public_url: required.
+  admin_token: "${FOMO_ADMIN_TOKEN}"
+
+# Relative paths are resolved against the directory of this file.
+store:
+  path: ./data/state.json
+  flush_interval: 30s
+
+log:
+  level: info                   # debug | info | warn | error
+  format: text                  # text | json, the console only
+  dir: ./logs                   # JSON lines, one file per run: logs/fomo-<time>.jsonl
+
+# PostgreSQL. The bot writes each watched token's current tier and the
+# history of tier changes (watch_tokens). Empty url keeps tiers in memory.
+# -record mode also stores the fomo feed here.
+database:
+  url: "${DATABASE_URL}"        # postgres://user:password@localhost:5432/fomo
+
+recorder:
+  feed_interval: 4s             # global thesis feed poll
+  history_max_pages: 10         # first look at a token from the feed: up to 250 theses
+  refresh_min_interval: 10s     # recheck a token at most this often after new theses
+  new_token_refresh: 30s        # recheck young tokens (first thesis < new_token_track_for ago) this often
+  new_token_track_for: 2h
+  all_tokens_refresh: 15m       # recheck other tokens with theses this often (0s = only on new theses)
+  track_for: 6h                 # keep following a token this long after its last activity
+  snapshot_interval: 60s        # /proxy/filterTokens metrics of all tracked tokens
+  snapshot_batch: 50
+  details_interval: 30m         # /proxy/tokenDetails per tracked token (0s = off)
+  retry_delay: 30s
+  trending:
+    enabled: true
+    ws_url: wss://prod-api.fomo.family/ws
+    topic_id: "1,56,143,4663,5042,8453,1399811149"
+    sample: 30s                 # store the trending list this often
+    history_pages: 1            # first look at a token seen only in trending

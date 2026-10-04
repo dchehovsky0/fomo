@@ -1,0 +1,1511 @@
+{
+ "success": true,
+ "message": "Token thesis feed retrieved successfully",
+ "responseObject": {
+  "items": [
+   {
+    "type": "thesis",
+    "id": "t2-35d908576919a02c21db4e4c250b5503921589187ff60257f57c491cb9586fa5-4ae64760",
+    "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+    "createdAt": "2026-09-26T13:12:12.355Z",
+    "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+    "displayName": "PureArmedPony",
+    "userHandle": "PureArmedPony",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-35d908576919a02c21db4e4c250b5503921589187ff60257f57c491cb9586fa5-4ae64760",
+     "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+     "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+     "comment": "Send it to trillions, make JPOW proud.",
+     "priceUsdAtCreation": 0.000538186444686,
+     "marketCapAtCreation": 532232.9145141674,
+     "fdvAtCreation": 532232.9145141674,
+     "createdAt": "2026-09-26T13:12:12.355Z",
+     "parentId": null,
+     "numLikes": 0,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Send it to trillions, make JPOW proud.",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 0
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 6,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 1914565.15,
+     "usdValue": 1352.45,
+     "unrealizedPnlUsd": 594.428,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 78.4182,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1352.45,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-af234fc8dbca52aeef6cff41d9201648219ddfb3ae5f64b52e7e86815c69730c-4d4bea59",
+    "tradeId": "518f128d-4633-4d5b-876e-fae38074a254",
+    "createdAt": "2026-09-26T13:11:12.488Z",
+    "userId": "08a5f28a-e431-569f-be68-047aceccb9d5",
+    "displayName": "0xblackwolf🐺",
+    "userHandle": "0xblackwolf",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/e428472cc94afc21d489419271ee730b_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-af234fc8dbca52aeef6cff41d9201648219ddfb3ae5f64b52e7e86815c69730c-4d4bea59",
+     "userId": "08a5f28a-e431-569f-be68-047aceccb9d5",
+     "tradeId": "518f128d-4633-4d5b-876e-fae38074a254",
+     "comment": "https://x.com/ericbolling/status/2103824780273287446",
+     "priceUsdAtCreation": 0.000538186444686,
+     "marketCapAtCreation": 532232.9145141674,
+     "fdvAtCreation": 532232.9145141674,
+     "createdAt": "2026-09-26T13:11:12.488Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "https://x.com/ericbolling/status/2103824780273287446",
+       "link": "https://x.com/ericbolling/status/2103824780273287446",
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 1686403.99,
+     "usdValue": 1191.28,
+     "unrealizedPnlUsd": 342.314,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 40.3214,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1191.28,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-44bc22664dd8fc44552070e6b72672ee4b025cf40f7a89bb7594ce9478e88ff7-a72b2e80",
+    "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+    "createdAt": "2026-09-26T13:11:10.994Z",
+    "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+    "displayName": "PureArmedPony",
+    "userHandle": "PureArmedPony",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-44bc22664dd8fc44552070e6b72672ee4b025cf40f7a89bb7594ce9478e88ff7-a72b2e80",
+     "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+     "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+     "comment": "Imagine not wanting to denominate your net worth in trillions, wouldn't be me.",
+     "priceUsdAtCreation": 0.000538186444686,
+     "marketCapAtCreation": 532232.9145141674,
+     "fdvAtCreation": 532232.9145141674,
+     "createdAt": "2026-09-26T13:11:10.994Z",
+     "parentId": null,
+     "numLikes": 2,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Imagine not wanting to denominate your net worth in trillions, wouldn't be me.",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 2
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 5,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 1914565.15,
+     "usdValue": 1352.45,
+     "unrealizedPnlUsd": 594.428,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 78.4182,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1352.45,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-19ac6d2bcc951c0098fdecc84b57cd23cac830990bebc76fd9a86238e32854f1-6ba7ca91",
+    "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+    "createdAt": "2026-09-26T13:11:01.830Z",
+    "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+    "displayName": "rikkisixx",
+    "userHandle": "rikkisixx",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-19ac6d2bcc951c0098fdecc84b57cd23cac830990bebc76fd9a86238e32854f1-6ba7ca91",
+     "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+     "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+     "comment": "1m is inevitable where were you when we hit it?",
+     "priceUsdAtCreation": 0.000538186444686,
+     "marketCapAtCreation": 532232.9145141674,
+     "fdvAtCreation": 532232.9145141674,
+     "createdAt": "2026-09-26T13:11:01.830Z",
+     "parentId": null,
+     "numLikes": 1,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "1m is inevitable where were you when we hit it?",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 1
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 4,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 2080398.32,
+     "usdValue": 1469.6,
+     "unrealizedPnlUsd": 179.199,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 13.8871,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1469.6,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-a5a2f212799f55a8ac039bde86450439ebd14b53543dc6d70c814f36f7752dd4-49d55fcc",
+    "tradeId": "24ce9b0e-e65c-46a4-b6e2-d6151cf01d53",
+    "createdAt": "2026-09-26T13:11:01.734Z",
+    "userId": "f8ce35d7-b24a-5a34-89c6-67fc07f131e9",
+    "displayName": "ShyGreenStork",
+    "userHandle": "ShyGreenStork",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-a5a2f212799f55a8ac039bde86450439ebd14b53543dc6d70c814f36f7752dd4-49d55fcc",
+     "userId": "f8ce35d7-b24a-5a34-89c6-67fc07f131e9",
+     "tradeId": "24ce9b0e-e65c-46a4-b6e2-d6151cf01d53",
+     "comment": "$DEBT — US debt meme on UsePaid fee share (same rail as $PAID). Fresh pump, real product flywheel, holding for next news pulse.\n\n$DEBT — 美债梗 + UsePaid 手续费分账（同 $PAID 那条产品轨）。新盘有真产品飞轮，拿着等下一波新闻脉冲。",
+     "priceUsdAtCreation": 0.000538186444686,
+     "marketCapAtCreation": 532232.9145141674,
+     "fdvAtCreation": 532232.9145141674,
+     "createdAt": "2026-09-26T13:11:01.734Z",
+     "parentId": null,
+     "numLikes": 6,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "$DEBT — US debt meme on UsePaid fee share (same rail as $PAID). Fresh pump, real product flywheel, holding for next news pulse.\n\n$DEBT — 美债梗 + UsePaid 手续费分账（同 $PAID 那条产品轨）。新盘有真产品飞轮，拿着等下一波新闻脉冲。",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 6
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 8401182.38,
+     "usdValue": 5934.6,
+     "unrealizedPnlUsd": 344.2,
+     "realizedPnlUsd": 285.173,
+     "percentageUnrealizedPnl": 6.15698,
+     "percentageRealizedPnl": 9.05817,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 6219.78,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-d084dfe16f6294a98e265a7ce6dc87425a846dd26346705319813608bf9ad48d-7394b05e",
+    "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+    "createdAt": "2026-09-26T13:08:39.216Z",
+    "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+    "displayName": "PureArmedPony",
+    "userHandle": "PureArmedPony",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-d084dfe16f6294a98e265a7ce6dc87425a846dd26346705319813608bf9ad48d-7394b05e",
+     "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+     "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+     "comment": "https://www.statista.com/chart/28393/us-public-debt/\n\nIts literally coded up and to the right, how are you not bidding?",
+     "priceUsdAtCreation": 0.000376817570475,
+     "marketCapAtCreation": 372649.1362878319,
+     "fdvAtCreation": 372649.1362878319,
+     "createdAt": "2026-09-26T13:08:39.216Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "https://www.statista.com/chart/28393/us-public-debt/\n\nIts literally coded up and to the right, how are you not bidding?",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 4,
+     "newerThesis": 2
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 1914565.15,
+     "usdValue": 1352.45,
+     "unrealizedPnlUsd": 594.428,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 78.4182,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1352.45,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-a2982a91661ba3e8a2eb88000d26f0af70f976bd916fd05c81bb8cfd14868db5-7c8cda48",
+    "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+    "createdAt": "2026-09-26T13:08:08.635Z",
+    "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+    "displayName": "rikkisixx",
+    "userHandle": "rikkisixx",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-a2982a91661ba3e8a2eb88000d26f0af70f976bd916fd05c81bb8cfd14868db5-7c8cda48",
+     "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+     "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+     "comment": "stay in the fucking trenches 🗣️",
+     "priceUsdAtCreation": 0.000376817570475,
+     "marketCapAtCreation": 372649.1362878319,
+     "fdvAtCreation": 372649.1362878319,
+     "createdAt": "2026-09-26T13:08:08.635Z",
+     "parentId": null,
+     "numLikes": 2,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "stay in the fucking trenches 🗣️",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 2
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 3,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 2080398.32,
+     "usdValue": 1469.6,
+     "unrealizedPnlUsd": 179.199,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 13.8871,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1469.6,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-a0c4c8d6ef2c0686faab5d952602f9cd344fe784e15b9187971a1dd0f2e5385b-dc7009d1",
+    "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+    "createdAt": "2026-09-26T13:06:28.967Z",
+    "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+    "displayName": "rikkisixx",
+    "userHandle": "rikkisixx",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-a0c4c8d6ef2c0686faab5d952602f9cd344fe784e15b9187971a1dd0f2e5385b-dc7009d1",
+     "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+     "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+     "comment": "steady coming back don’t fold.",
+     "priceUsdAtCreation": 0.000376817570475,
+     "marketCapAtCreation": 372649.1362878319,
+     "fdvAtCreation": 372649.1362878319,
+     "createdAt": "2026-09-26T13:06:28.967Z",
+     "parentId": null,
+     "numLikes": 1,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "steady coming back don’t fold.",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 1
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 2,
+     "newerThesis": 2
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 2080398.32,
+     "usdValue": 1469.6,
+     "unrealizedPnlUsd": 179.199,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 13.8871,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1469.6,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-3fe639e7b28e3f2fbcb273d0598332e1165f3327d48907db66f22f52156b5986-9f1f9a2b",
+    "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+    "createdAt": "2026-09-26T13:06:22.839Z",
+    "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+    "displayName": "PureArmedPony",
+    "userHandle": "PureArmedPony",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-3fe639e7b28e3f2fbcb273d0598332e1165f3327d48907db66f22f52156b5986-9f1f9a2b",
+     "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+     "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+     "comment": "Hard coding my net worth to the US debt",
+     "priceUsdAtCreation": 0.000376817570475,
+     "marketCapAtCreation": 372649.1362878319,
+     "fdvAtCreation": 372649.1362878319,
+     "createdAt": "2026-09-26T13:06:22.839Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Hard coding my net worth to the US debt",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 3,
+     "newerThesis": 3
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 1914565.15,
+     "usdValue": 1352.45,
+     "unrealizedPnlUsd": 594.428,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 78.4182,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1352.45,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-66828198bcf5216c4ece5d099409eec36af418b65a568f9218db8c5f9c010616-e2c9b062",
+    "tradeId": "d4e1c683-c194-4489-b8fd-4717f999d4fe",
+    "createdAt": "2026-09-26T13:05:11.619Z",
+    "userId": "699e322b-5b0e-5686-8bc7-9b2133dcb660",
+    "displayName": "1ManWreck",
+    "userHandle": "1ManWreck",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/51cf33e640e492d11ce2ad988a36fe76_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-66828198bcf5216c4ece5d099409eec36af418b65a568f9218db8c5f9c010616-e2c9b062",
+     "userId": "699e322b-5b0e-5686-8bc7-9b2133dcb660",
+     "tradeId": "d4e1c683-c194-4489-b8fd-4717f999d4fe",
+     "comment": "Ohhh I’m in DEBTTTT",
+     "priceUsdAtCreation": 0.000470793031749,
+     "marketCapAtCreation": 465585.0215010987,
+     "fdvAtCreation": 465585.0215010987,
+     "createdAt": "2026-09-26T13:05:11.619Z",
+     "parentId": null,
+     "numLikes": 2,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Ohhh I’m in DEBTTTT",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 2
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 2.32831e-10,
+     "usdValue": 1.64472e-13,
+     "unrealizedPnlUsd": 0,
+     "realizedPnlUsd": 291.615,
+     "percentageUnrealizedPnl": 0,
+     "percentageRealizedPnl": 24.4233,
+     "closedAt": "2026-09-26T13:08:30.448Z"
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1485.62,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-7af9b91f6b784851c7a38db7019fc4cb997d1f6064be69a2cc9bff8890ce2f77-cddebb94",
+    "tradeId": "039c1b39-5d6e-4b7e-8170-e478d4eea876",
+    "createdAt": "2026-09-26T13:03:43.325Z",
+    "userId": "84b6a974-8702-50cb-911a-7d3b27218547",
+    "displayName": "Simon",
+    "userHandle": "SimonSAT",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/5a3874472da0133f7761462fb8feebe7_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-7af9b91f6b784851c7a38db7019fc4cb997d1f6064be69a2cc9bff8890ce2f77-cddebb94",
+     "userId": "84b6a974-8702-50cb-911a-7d3b27218547",
+     "tradeId": "039c1b39-5d6e-4b7e-8170-e478d4eea876",
+     "comment": "Almost 4k holders",
+     "priceUsdAtCreation": 0.000470793031749,
+     "marketCapAtCreation": 465585.0215010987,
+     "fdvAtCreation": 465585.0215010987,
+     "createdAt": "2026-09-26T13:03:43.325Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Almost 4k holders",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 1,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 4382576.91,
+     "usdValue": 3095.86,
+     "unrealizedPnlUsd": 861.949,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 38.5848,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 3095.86,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-95ead96c5179918de517118ced948e51013075092a86f1a8d8454e27e2dd4fa6-25a5d911",
+    "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+    "createdAt": "2026-09-26T12:57:18.930Z",
+    "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+    "displayName": "rikkisixx",
+    "userHandle": "rikkisixx",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-95ead96c5179918de517118ced948e51013075092a86f1a8d8454e27e2dd4fa6-25a5d911",
+     "userId": "9a03b261-0ccc-570a-9769-073c8088c0fc",
+     "tradeId": "c4d6ca9d-9fc0-47f7-9560-57f92660f320",
+     "comment": "show me what typa person you are. to the moon.",
+     "priceUsdAtCreation": 0.000415547448825,
+     "marketCapAtCreation": 410950.57668369,
+     "fdvAtCreation": 410950.57668369,
+     "createdAt": "2026-09-26T12:57:18.930Z",
+     "parentId": null,
+     "numLikes": 5,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "show me what typa person you are. to the moon.",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 5
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 1,
+     "newerThesis": 3
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 2080398.32,
+     "usdValue": 1469.6,
+     "unrealizedPnlUsd": 179.199,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 13.8871,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1469.6,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-712ef925a24fa070c748c1cbc91a5467daf0c91233fa4bcd879c41c0160ef78f-ac6c5873",
+    "tradeId": "3ae3f126-2582-446a-805f-0ca4bea67731",
+    "createdAt": "2026-09-26T12:57:10.658Z",
+    "userId": "c9beb06a-787f-54cd-94cc-6b4230bfdd86",
+    "displayName": "Brodo29",
+    "userHandle": "Brodo29",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/c5c2266c2eafa1abbf58c902aa565e69_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-712ef925a24fa070c748c1cbc91a5467daf0c91233fa4bcd879c41c0160ef78f-ac6c5873",
+     "userId": "c9beb06a-787f-54cd-94cc-6b4230bfdd86",
+     "tradeId": "3ae3f126-2582-446a-805f-0ca4bea67731",
+     "comment": "Just stop sell it",
+     "priceUsdAtCreation": 0.000415547448825,
+     "marketCapAtCreation": 410950.57668369,
+     "fdvAtCreation": 410950.57668369,
+     "createdAt": "2026-09-26T12:57:10.658Z",
+     "parentId": null,
+     "numLikes": 15,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Just stop sell it",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 15
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 7867749.05,
+     "usdValue": 5557.79,
+     "unrealizedPnlUsd": 2094.54,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 60.479,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 5557.79,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-dcd6af312502d17eb376a479b97ed7cda0da6b4121b05afcce5a5c124387dee3-03770770",
+    "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+    "createdAt": "2026-09-26T12:54:55.531Z",
+    "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+    "displayName": "PureArmedPony",
+    "userHandle": "PureArmedPony",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-dcd6af312502d17eb376a479b97ed7cda0da6b4121b05afcce5a5c124387dee3-03770770",
+     "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+     "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+     "comment": "Literally coded to trillions, how else are we gonna pay the debt",
+     "priceUsdAtCreation": 0.00044730346904,
+     "marketCapAtCreation": 442355.30521092255,
+     "fdvAtCreation": 442355.30521092255,
+     "createdAt": "2026-09-26T12:54:55.531Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Literally coded to trillions, how else are we gonna pay the debt",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 1,
+     "newerThesis": 5
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 1914565.15,
+     "usdValue": 1352.45,
+     "unrealizedPnlUsd": 594.428,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 78.4182,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1352.45,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-968388fdb9e66fe473478b9836af3618a5a41aedf0b74a222c2a3ae16548ad20-4d819520",
+    "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+    "createdAt": "2026-09-26T12:52:57.398Z",
+    "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+    "displayName": "PureArmedPony",
+    "userHandle": "PureArmedPony",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-968388fdb9e66fe473478b9836af3618a5a41aedf0b74a222c2a3ae16548ad20-4d819520",
+     "userId": "379cbbeb-887d-59bb-8a10-5a8f4e3feded",
+     "tradeId": "3245387f-9592-4ade-83d1-d6c10cb2294e",
+     "comment": "Needs to go trillions to pay the debt",
+     "priceUsdAtCreation": 0.000254467395713,
+     "marketCapAtCreation": 251652.42617242213,
+     "fdvAtCreation": 251652.42617242213,
+     "createdAt": "2026-09-26T12:52:57.398Z",
+     "parentId": null,
+     "numLikes": 1,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Needs to go trillions to pay the debt",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 1
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 6
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 1914565.15,
+     "usdValue": 1352.45,
+     "unrealizedPnlUsd": 594.428,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 78.4182,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1352.45,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-896d28900d430caef69c31f62b95f87ef914a7872dabc47535dc0eb9b7532325-45237eda",
+    "tradeId": "039c1b39-5d6e-4b7e-8170-e478d4eea876",
+    "createdAt": "2026-09-26T12:50:57.069Z",
+    "userId": "84b6a974-8702-50cb-911a-7d3b27218547",
+    "displayName": "Simon",
+    "userHandle": "SimonSAT",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/5a3874472da0133f7761462fb8feebe7_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-896d28900d430caef69c31f62b95f87ef914a7872dabc47535dc0eb9b7532325-45237eda",
+     "userId": "84b6a974-8702-50cb-911a-7d3b27218547",
+     "tradeId": "039c1b39-5d6e-4b7e-8170-e478d4eea876",
+     "comment": "Theirs paid at 35mil and cashed at 3mil",
+     "priceUsdAtCreation": 0.000254467395713,
+     "marketCapAtCreation": 251652.42617242213,
+     "fdvAtCreation": 251652.42617242213,
+     "createdAt": "2026-09-26T12:50:57.069Z",
+     "parentId": null,
+     "numLikes": 6,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Theirs paid at 35mil and cashed at 3mil",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 6
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 4382576.91,
+     "usdValue": 3095.86,
+     "unrealizedPnlUsd": 861.949,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 38.5848,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 3095.86,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-409fb5fe1ed60809fea45458c261bcebe07ace19ae4d74c46ddd5823b80f8ab5-552ecee1",
+    "tradeId": "8cf7e302-04bc-4916-be2b-c2bf4427bd6f",
+    "createdAt": "2026-09-26T12:49:59.675Z",
+    "userId": "28890292-8917-591c-866d-008ba59fc676",
+    "displayName": "chicoooo",
+    "userHandle": "chicoooo",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/b59ce0d590038d7c8f6249cf86b79f2c_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-409fb5fe1ed60809fea45458c261bcebe07ace19ae4d74c46ddd5823b80f8ab5-552ecee1",
+     "userId": "28890292-8917-591c-866d-008ba59fc676",
+     "tradeId": "8cf7e302-04bc-4916-be2b-c2bf4427bd6f",
+     "comment": "Repositioning myself DCA is the way ATH gonna get crushed soon!",
+     "priceUsdAtCreation": 0.000254467395713,
+     "marketCapAtCreation": 251652.42617242213,
+     "fdvAtCreation": 251652.42617242213,
+     "createdAt": "2026-09-26T12:49:59.675Z",
+     "parentId": null,
+     "numLikes": 6,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Repositioning myself DCA is the way ATH gonna get crushed soon!",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 6
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 1,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 0,
+     "usdValue": 0,
+     "unrealizedPnlUsd": 0,
+     "realizedPnlUsd": -99.7368,
+     "percentageUnrealizedPnl": 0,
+     "percentageRealizedPnl": -3.34124,
+     "closedAt": "2026-09-26T13:08:18.644Z"
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 3084.75,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-a32f958b33eb4d15d6bbbc2f4f99efa0cdb21f575339614e5872ed4bd5fa555a-a9237438",
+    "tradeId": "b548e7f5-e3ee-4a52-ab74-f286dd39533d",
+    "createdAt": "2026-09-26T12:48:38.343Z",
+    "userId": "b64979a2-c7cd-5dcc-9232-7e4c683c247f",
+    "displayName": "Mrpunk.eth",
+    "userHandle": "mrpunkdoteth",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/da5ea0ae381652ce2c3741dd069eefc9_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-a32f958b33eb4d15d6bbbc2f4f99efa0cdb21f575339614e5872ed4bd5fa555a-a9237438",
+     "userId": "b64979a2-c7cd-5dcc-9232-7e4c683c247f",
+     "tradeId": "b548e7f5-e3ee-4a52-ab74-f286dd39533d",
+     "comment": "https://x.com/ericbolling/status/2103824780273287446?s=46",
+     "priceUsdAtCreation": 0.00076308707102,
+     "marketCapAtCreation": 754645.6544748314,
+     "fdvAtCreation": 754645.6544748314,
+     "createdAt": "2026-09-26T12:48:38.343Z",
+     "parentId": null,
+     "numLikes": 5,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "https://x.com/ericbolling/status/2103824780273287446?s=46",
+       "link": "https://x.com/ericbolling/status/2103824780273287446?s=46",
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 5
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 3,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 9.31323e-10,
+     "usdValue": 6.57887e-13,
+     "unrealizedPnlUsd": 0,
+     "realizedPnlUsd": 2784.43,
+     "percentageUnrealizedPnl": 0,
+     "percentageRealizedPnl": 66.9186,
+     "closedAt": "2026-09-26T12:50:37.185Z"
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 6945.34,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-1fe9b39ff006166d8d3d26bbe469fb643d086f4a7f3e86ceeae9366ded83a093-f6a55e27",
+    "tradeId": "a71c169a-72ec-42b1-b4b9-bcdaa040e37d",
+    "createdAt": "2026-09-26T12:47:46.933Z",
+    "userId": "7bee0605-eedb-54c4-84d1-81c757a154bb",
+    "displayName": "Von",
+    "userHandle": "Vonit0",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/d9530911ab8f490eaba67c58a9a28ca4_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-1fe9b39ff006166d8d3d26bbe469fb643d086f4a7f3e86ceeae9366ded83a093-f6a55e27",
+     "userId": "7bee0605-eedb-54c4-84d1-81c757a154bb",
+     "tradeId": "a71c169a-72ec-42b1-b4b9-bcdaa040e37d",
+     "comment": "what goes down must come up.",
+     "priceUsdAtCreation": 0.00076308707102,
+     "marketCapAtCreation": 754645.6544748314,
+     "fdvAtCreation": 754645.6544748314,
+     "createdAt": "2026-09-26T12:47:46.933Z",
+     "parentId": null,
+     "numLikes": 4,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "what goes down must come up.",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 4
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 2176902.75,
+     "usdValue": 1537.77,
+     "unrealizedPnlUsd": 344.087,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 28.8257,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1537.77,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-34a47f1cabf463b3ab404aa9a65d517ad48ee2200ed4f870c0daf28d704712b7-87ce2873",
+    "tradeId": "62c53fdd-f0f2-4ee9-b398-ebe3a54238e9",
+    "createdAt": "2026-09-26T12:47:34.690Z",
+    "userId": "5659af6d-14c2-5d21-a3af-d63e95d309c0",
+    "displayName": "MrPonson",
+    "userHandle": "MrPonson",
+    "profilePictureLink": null,
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-34a47f1cabf463b3ab404aa9a65d517ad48ee2200ed4f870c0daf28d704712b7-87ce2873",
+     "userId": "5659af6d-14c2-5d21-a3af-d63e95d309c0",
+     "tradeId": "62c53fdd-f0f2-4ee9-b398-ebe3a54238e9",
+     "comment": "Guya we can push it",
+     "priceUsdAtCreation": 0.00076308707102,
+     "marketCapAtCreation": 754645.6544748314,
+     "fdvAtCreation": 754645.6544748314,
+     "createdAt": "2026-09-26T12:47:34.690Z",
+     "parentId": null,
+     "numLikes": 2,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Guya we can push it",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 2
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 2,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 0,
+     "usdValue": 0,
+     "unrealizedPnlUsd": 0,
+     "realizedPnlUsd": 411.804,
+     "percentageUnrealizedPnl": 0,
+     "percentageRealizedPnl": 36.7216,
+     "closedAt": "2026-09-26T12:51:39.264Z"
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1533.23,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-1d209d0aea288535ad29caf59d2baffee63352f5656e1dc94968c66a9cbc8173-04c9f4b6",
+    "tradeId": "2c757dc5-3af1-43d1-bba0-d7a8fc98b2a2",
+    "createdAt": "2026-09-26T12:47:24.227Z",
+    "userId": "7c1ef615-693b-5752-b0f1-155a9f0c2fe5",
+    "displayName": "cryptofan 81",
+    "userHandle": "Cryptofan19811",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/d06f9786eb5295e140dfd941c2c0365a_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-1d209d0aea288535ad29caf59d2baffee63352f5656e1dc94968c66a9cbc8173-04c9f4b6",
+     "userId": "7c1ef615-693b-5752-b0f1-155a9f0c2fe5",
+     "tradeId": "2c757dc5-3af1-43d1-bba0-d7a8fc98b2a2",
+     "comment": "guess jeets trying to pay off their lunch money debt lol",
+     "priceUsdAtCreation": 0.00076308707102,
+     "marketCapAtCreation": 754645.6544748314,
+     "fdvAtCreation": 754645.6544748314,
+     "createdAt": "2026-09-26T12:47:24.227Z",
+     "parentId": null,
+     "numLikes": 6,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "guess jeets trying to pay off their lunch money debt lol",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 6
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 1,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 3071613.92,
+     "usdValue": 2169.79,
+     "unrealizedPnlUsd": 669.269,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 44.6024,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 2169.79,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-b08fa027d59c21ad1cbc02ce5f4c6d59c0aaa1b0413f62d8502c4a3088b1efe0-eb0a234d",
+    "tradeId": "8cf7e302-04bc-4916-be2b-c2bf4427bd6f",
+    "createdAt": "2026-09-26T12:44:34.903Z",
+    "userId": "28890292-8917-591c-866d-008ba59fc676",
+    "displayName": "chicoooo",
+    "userHandle": "chicoooo",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/b59ce0d590038d7c8f6249cf86b79f2c_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-b08fa027d59c21ad1cbc02ce5f4c6d59c0aaa1b0413f62d8502c4a3088b1efe0-eb0a234d",
+     "userId": "28890292-8917-591c-866d-008ba59fc676",
+     "tradeId": "8cf7e302-04bc-4916-be2b-c2bf4427bd6f",
+     "comment": "Healthy dip, jeets out time to ape more!",
+     "priceUsdAtCreation": 0.00106901702993,
+     "marketCapAtCreation": 1057191.3570989089,
+     "fdvAtCreation": 1057191.3570989089,
+     "createdAt": "2026-09-26T12:44:34.903Z",
+     "parentId": null,
+     "numLikes": 3,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "Healthy dip, jeets out time to ape more!",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 3
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 0,
+     "usdValue": 0,
+     "unrealizedPnlUsd": 0,
+     "realizedPnlUsd": -99.7368,
+     "percentageUnrealizedPnl": 0,
+     "percentageRealizedPnl": -3.34124,
+     "closedAt": "2026-09-26T13:08:18.644Z"
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 3084.75,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-b7ec9401be4b4ba6f7a7655df21ff88d3ee5ee619540a5150cd64d671d6d159f-5f65dc87",
+    "tradeId": "f69c0651-797c-4aad-8f4d-9bc7ca8f9020",
+    "createdAt": "2026-09-26T12:44:26.190Z",
+    "userId": "83825883-1d7a-5255-82aa-54eacfb035a3",
+    "displayName": "Degen KJ",
+    "userHandle": "Degen_KJ",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/a8516d627c923477e534982e2cd54ac3_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-b7ec9401be4b4ba6f7a7655df21ff88d3ee5ee619540a5150cd64d671d6d159f-5f65dc87",
+     "userId": "83825883-1d7a-5255-82aa-54eacfb035a3",
+     "tradeId": "f69c0651-797c-4aad-8f4d-9bc7ca8f9020",
+     "comment": "This still genny",
+     "priceUsdAtCreation": 0.00106901702993,
+     "marketCapAtCreation": 1057191.3570989089,
+     "fdvAtCreation": 1057191.3570989089,
+     "createdAt": "2026-09-26T12:44:26.190Z",
+     "parentId": null,
+     "numLikes": 2,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "This still genny",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 2
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 6,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 0,
+     "usdValue": 0,
+     "unrealizedPnlUsd": 0,
+     "realizedPnlUsd": 416.265,
+     "percentageUnrealizedPnl": 0,
+     "percentageRealizedPnl": 46.484,
+     "closedAt": "2026-09-26T12:45:33.831Z"
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 1311.77,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-deffaa8adc5a3cc0d9b7c2f5a109f069829271aab394c4586d9b03a950c6fce2-644bcc2f",
+    "tradeId": "6fd66323-a02c-44c9-81ff-74f92680d212",
+    "createdAt": "2026-09-26T12:43:07.316Z",
+    "userId": "81d7874b-5424-5086-b1dc-8fc85c942d1f",
+    "displayName": "TheBissshop",
+    "userHandle": "0xdeggnbishop",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/f21c5dc9e25443bbfad763b09452d17e_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-deffaa8adc5a3cc0d9b7c2f5a109f069829271aab394c4586d9b03a950c6fce2-644bcc2f",
+     "userId": "81d7874b-5424-5086-b1dc-8fc85c942d1f",
+     "tradeId": "6fd66323-a02c-44c9-81ff-74f92680d212",
+     "comment": "https://x.com/ericbolling/status/2103824780273287446?s=46&t=FTpOhvmbjuCCwcMXZ2fvkg",
+     "priceUsdAtCreation": 0.00106901702993,
+     "marketCapAtCreation": 1057191.3570989089,
+     "fdvAtCreation": 1057191.3570989089,
+     "createdAt": "2026-09-26T12:43:07.316Z",
+     "parentId": null,
+     "numLikes": 5,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "https://x.com/ericbolling/status/2103824780273287446?s=46&t=FTpOhvmbjuCCwcMXZ2fvkg",
+       "link": "https://x.com/ericbolling/status/2103824780273287446?s=46&t=FTpOhvmbjuCCwcMXZ2fvkg",
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 5
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 1,
+     "newerThesis": 0
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 9.31323e-10,
+     "usdValue": 6.57887e-13,
+     "unrealizedPnlUsd": 0,
+     "realizedPnlUsd": 527.996,
+     "percentageUnrealizedPnl": 0,
+     "percentageRealizedPnl": 33.434,
+     "closedAt": "2026-09-26T12:59:28.647Z"
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 2107.22,
+    "isDev": false
+   },
+   {
+    "type": "thesis",
+    "id": "t2-7ef9cb938477e2f1bd4eb87e74890da240347dcf7258bbdcf5ecbee9afbad7ae-5ee3e2fa",
+    "tradeId": "2c757dc5-3af1-43d1-bba0-d7a8fc98b2a2",
+    "createdAt": "2026-09-26T12:42:55.395Z",
+    "userId": "7c1ef615-693b-5752-b0f1-155a9f0c2fe5",
+    "displayName": "cryptofan 81",
+    "userHandle": "Cryptofan19811",
+    "profilePictureLink": "https://prod-fomo-profile-pics.s3.amazonaws.com/d06f9786eb5295e140dfd941c2c0365a_small.jpg?k=269W2LFsu8cjo7kVbxpjVV-OQ",
+    "verified": false,
+    "twitter": null,
+    "comment": {
+     "id": "t2-7ef9cb938477e2f1bd4eb87e74890da240347dcf7258bbdcf5ecbee9afbad7ae-5ee3e2fa",
+     "userId": "7c1ef615-693b-5752-b0f1-155a9f0c2fe5",
+     "tradeId": "2c757dc5-3af1-43d1-bba0-d7a8fc98b2a2",
+     "comment": "finally something that the fees can make a difference lets send trillions",
+     "priceUsdAtCreation": 0.00106901702993,
+     "marketCapAtCreation": 1057191.3570989089,
+     "fdvAtCreation": 1057191.3570989089,
+     "createdAt": "2026-09-26T12:42:55.395Z",
+     "parentId": null,
+     "numLikes": 1,
+     "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+     "networkId": 1399811149,
+     "shortCommentSegments": [
+      {
+       "text": "finally something that the fees can make a difference lets send trillions",
+       "link": null,
+       "provider": null
+      }
+     ],
+     "reactions": {
+      "counts": {
+       "likeCount": 1
+      },
+      "reactions": {
+       "like": false
+      }
+     },
+     "olderThesis": 0,
+     "newerThesis": 1
+    },
+    "numReplies": 0,
+    "authorTrade": {
+     "humanTokenAmount": 3071613.92,
+     "usdValue": 2169.79,
+     "unrealizedPnlUsd": 669.269,
+     "realizedPnlUsd": 0,
+     "percentageUnrealizedPnl": 44.6024,
+     "percentageRealizedPnl": 0,
+     "closedAt": null
+    },
+    "tokenAddress": "FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt",
+    "networkId": 1399811149,
+    "ticker": "DEBT",
+    "tokenImageUrl": "https://token-media.defined.fi/1399811149_FYM6PhwAS3QwTBwvgLj8JYeMgpNfKsWtW3hGxPM9eFkt_small_3e1b4a444a5a.png",
+    "equity": 0,
+    "threshold": 2169.79,
+    "isDev": false
+   }
+  ],
+  "hasNextPage": true,
+  "count": 663
+ },
+ "statusCode": 200
+}

@@ -1,0 +1,26 @@
+{
+  "run_duration": "3h30m",
+  "poll_interval": "2s",
+  "per_account_min_interval": "1500ms",
+  "auth_cooldown": "5m",
+  "rate_limit_cooldown": "5m",
+  "max_rate_limit_cooldown": "30m",
+  "request_timeout": "15s",
+  "browser_ready_timeout": "90s",
+  "thesis_lookback": "5m",
+  "audit_lookback": "30m",
+  "audit_every": 10,
+  "thesis_limit": 500,
+  "thesis_threshold": 0,
+  "fomo_app_url": "https://fomo.family/token",
+  "chrome_path": "",
+  "headless": false,
+  "log_dir": "./logs",
+  "accounts": [
+    {"id": "acc01", "profile_dir": "./profiles/acc01", "debug_url": "http://127.0.0.1:9221"},
+    {"id": "acc02", "profile_dir": "./profiles/acc02", "debug_url": "http://127.0.0.1:9222"},
+    {"id": "acc03", "profile_dir": "./profiles/acc03", "debug_url": "http://127.0.0.1:9223"},
+    {"id": "acc04", "profile_dir": "./profiles/acc04", "debug_url": "http://127.0.0.1:9224"},
+    {"id": "acc05", "profile_dir": "./profiles/acc05", "debug_url": "http://127.0.0.1:9225"}
+  ]
+}
