@@ -211,6 +211,8 @@ func (g *Gate) wave(ctx context.Context, emit func(domain.Token)) {
 		if !it.token.CreatedAt.IsZero() {
 			att.TokenAgeSec = int(now.Sub(it.token.CreatedAt).Round(time.Second) / time.Second)
 		}
+		var liq float64
+		var picture string
 		decision, why := "", ""
 		switch {
 		case failedSet[mint]:
@@ -222,6 +224,8 @@ func (g *Gate) wave(ctx context.Context, emit func(domain.Token)) {
 			att.CapKnown = ok && q.MarketCap > 0
 			att.VolumeUSD = q.VolumeUSD
 			att.VolumeKnown = ok && q.VolumeKnown
+			liq = q.LiquidityUSD
+			picture = q.ImageURL
 			switch {
 			case !ok || q.MarketCap <= 0:
 				// An empty answer is not a rejection. Asked again below.
@@ -249,7 +253,16 @@ func (g *Gate) wave(ctx context.Context, emit func(domain.Token)) {
 		g.log.Info("flow", "step", "капа", "decision", decision, "why", why,
 			"token", mint, "ticker", it.token.Symbol,
 			"mc", att.MarketCap, "volume", att.VolumeUSD, "request", att.N)
-		emit(it.token)
+		tok := it.token
+		tok.EntryMarketCap = att.MarketCap
+		if att.VolumeKnown {
+			tok.EntryVolumeUSD = att.VolumeUSD
+		}
+		tok.EntryLiquidityUSD = liq
+		if tok.ImageURL == "" {
+			tok.ImageURL = domain.PictureURL(picture)
+		}
+		emit(tok)
 	}
 }
 
@@ -340,6 +353,12 @@ type Book interface {
 	Release(mint string) bool
 }
 
+// quoteSink receives the latest DexScreener numbers for a watched token.
+// The watch board implements it. A book that does not is left as it is.
+type quoteSink interface {
+	NoteQuote(mint string, marketCap, volume, liquidity float64, volumeKnown bool, image string, at time.Time)
+}
+
 // Recheck compares volume.h24 with the previous sample for tokens in tiers 1–3.
 // Growth under MinGrowth is a bad sample. Two bad samples in a row remove the
 // token. A missing answer is not a sample and does not change the streak.
@@ -396,7 +415,13 @@ func (g *Gate) recheck(ctx context.Context, book Book) {
 				continue
 			}
 			q, ok := quotes[mint]
-			if !ok || !q.VolumeKnown {
+			if !ok {
+				continue
+			}
+			if sink, ok := book.(quoteSink); ok {
+				sink.NoteQuote(mint, q.MarketCap, q.VolumeUSD, q.LiquidityUSD, q.VolumeKnown, q.ImageURL, g.now())
+			}
+			if !q.VolumeKnown {
 				continue
 			}
 			g.judgeVolume(book, byMint[mint], q.VolumeUSD)

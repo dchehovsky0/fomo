@@ -37,7 +37,7 @@ func TestTokensBatch(t *testing.T) {
 		path = r.URL.Path
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[
-			{"dexId":"pump","pairAddress":"p1","marketCap":4000,"fdv":9000,"baseToken":{"address":"mintA"}},
+			{"dexId":"pump","pairAddress":"p1","marketCap":4000,"fdv":9000,"baseToken":{"address":"mintA"},"info":{"imageUrl":"https://cdn.dexscreener.com/cms/images/a.png"}},
 			{"dexId":"raydium","pairAddress":"p2","marketCap":0,"fdv":20000,"liquidity":{"usd":5},"baseToken":{"address":"mintB"}},
 			{"dexId":"raydium","pairAddress":"p3","marketCap":50000,"liquidity":{"usd":90},"baseToken":{"address":"mintB"}}
 		]`))
@@ -52,7 +52,7 @@ func TestTokensBatch(t *testing.T) {
 	if !strings.Contains(path, "/tokens/v1/solana/mintA,mintB") {
 		t.Fatalf("path = %s", path)
 	}
-	if got["mintA"].MarketCap != 4000 {
+	if got["mintA"].MarketCap != 4000 || got["mintA"].ImageURL != "https://cdn.dexscreener.com/cms/images/a.png" {
 		t.Fatalf("mintA = %+v", got["mintA"])
 	}
 	if got["mintB"].MarketCap != 50000 || got["mintB"].PairAddress != "p3" {

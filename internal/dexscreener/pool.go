@@ -111,7 +111,7 @@ func (p *Pool) Wave(ctx context.Context, mints []string) (quotes map[string]Quot
 				return
 			}
 			for mint, pair := range got {
-				quotes[mint] = Quote{MarketCap: pair.MarketCap, VolumeUSD: pair.VolumeUSD, VolumeKnown: pair.VolumeKnown}
+				quotes[mint] = Quote{MarketCap: pair.MarketCap, VolumeUSD: pair.VolumeUSD, VolumeKnown: pair.VolumeKnown, LiquidityUSD: pair.LiquidityUSD, ImageURL: pair.ImageURL}
 			}
 		}(p.clients[i%len(p.clients)], batch)
 	}

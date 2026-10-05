@@ -3,6 +3,7 @@
 // these types; nothing here knows about them.
 package domain
 
+import "strings"
 import "time"
 
 const (
@@ -19,6 +20,36 @@ type Token struct {
 	Pool   string
 	Symbol string
 	Name   string
+	// Taken from the launch message and kept until the token is watched.
+	Deployer     string
+	Website      string
+	Twitter      string
+	Telegram     string
+	Discord      string
+	ImageURL     string
+	LiquiditySOL float64
+	// DexScreener at the moment the cap filter let the token into the watch.
+	EntryMarketCap    float64
+	EntryVolumeUSD    float64
+	EntryLiquidityUSD float64
+}
+
+// PictureURL is an image address the board can load. ipfs:// becomes an
+// https gateway. Anything that is not http(s) or ipfs is dropped.
+func PictureURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "ipfs://") {
+		rest := strings.TrimPrefix(raw, "ipfs://")
+		rest = strings.TrimPrefix(rest, "ipfs/")
+		if rest == "" {
+			return ""
+		}
+		return "https://ipfs.io/ipfs/" + rest
+	}
+	if strings.HasPrefix(raw, "https://") || strings.HasPrefix(raw, "http://") {
+		return raw
+	}
+	return ""
 }
 
 // Thesis is one thesis as shown in alerts and on the theses page.
@@ -61,6 +92,14 @@ type Alert struct {
 	// theses could be fetched and these are the earliest of that part.
 	First      []Thesis `json:"first"`
 	FirstExact bool     `json:"first_exact"`
+	// Latest is the newest theses at alert time, oldest first, at most as
+	// many as First. The feed shows these.
+	Latest []Thesis `json:"latest,omitempty"`
+	// Theses is every thesis fetched for the alert, oldest first. The open
+	// token page sorts this list. Empty on alerts saved before that page.
+	Theses []Thesis `json:"theses,omitempty"`
+	// Tier is the watch tier (1–4) when a theses alert was sent.
+	Tier int `json:"tier,omitempty"`
 
 	CreatedAt  time.Time `json:"created_at,omitzero"`
 	Dex        string    `json:"dex,omitempty"`

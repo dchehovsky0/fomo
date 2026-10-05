@@ -23,15 +23,18 @@ type Pair struct {
 	// volume object; a reported 0 is known.
 	VolumeUSD   float64
 	VolumeKnown bool
+	ImageURL    string
 	TokenName   string
 	TokenSymbol string
 }
 
 // Quote is the market cap and volume used to screen a mint.
 type Quote struct {
-	MarketCap   float64
-	VolumeUSD   float64
-	VolumeKnown bool
+	MarketCap    float64
+	VolumeUSD    float64
+	VolumeKnown  bool
+	LiquidityUSD float64
+	ImageURL     string
 }
 
 type Client struct {
@@ -59,6 +62,9 @@ type apiPair struct {
 		Name    string `json:"name"`
 		Symbol  string `json:"symbol"`
 	} `json:"baseToken"`
+	Info *struct {
+		ImageURL string `json:"imageUrl"`
+	} `json:"info"`
 }
 
 // Pairs returns the Solana pairs of a token as listed by DexScreener.
@@ -134,9 +140,15 @@ func (c *Client) Tokens(ctx context.Context, mints []string) (map[string]Pair, e
 			// Total volume is the sum of the pools that reported one.
 			pair.VolumeUSD += prev.VolumeUSD
 			pair.VolumeKnown = pair.VolumeKnown || prev.VolumeKnown
+			if pair.ImageURL == "" {
+				pair.ImageURL = prev.ImageURL
+			}
 			if !betterCap(pair, prev) {
 				prev.VolumeUSD = pair.VolumeUSD
 				prev.VolumeKnown = pair.VolumeKnown
+				if prev.ImageURL == "" {
+					prev.ImageURL = pair.ImageURL
+				}
 				out[mint] = prev
 				continue
 			}
@@ -157,6 +169,9 @@ func pairFromAPI(p apiPair) Pair {
 	if p.Volume != nil {
 		pair.VolumeUSD = p.Volume.H24
 		pair.VolumeKnown = true
+	}
+	if p.Info != nil {
+		pair.ImageURL = strings.TrimSpace(p.Info.ImageURL)
 	}
 	return pair
 }

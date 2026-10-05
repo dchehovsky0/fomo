@@ -168,6 +168,8 @@ func (b *Builder) addTheses(ctx context.Context, a *notify.Alert, hint *fomo.Tok
 		sorted := notify.SortByTime(all.Items)
 		a.First = notify.ThesesFrom(sorted[:min(b.cfg.FirstN, len(sorted))])
 		a.FirstExact = true
+		b.setLatest(a, sorted)
+		b.rememberTheses(a, all.Items)
 		from := now.Add(-b.cfg.RateWindow)
 		a.RateKnown, a.Recent = true, 0
 		for _, t := range sorted {
@@ -178,12 +180,15 @@ func (b *Builder) addTheses(ctx context.Context, a *notify.Alert, hint *fomo.Tok
 		return
 	}
 
+	var recent []fomo.Thesis
 	if p, err := b.query(ctx, a.Token, now.Add(-b.cfg.RateWindow), now.Add(time.Minute), b.cfg.RateLimit, queries); err != nil {
 		b.log.Warn("recent theses for alert", "token", a.Token, "err", err)
 	} else {
+		recent = p.Items
 		a.RateKnown, a.Recent = true, len(p.Items)
 		a.RecentCapped = len(p.Items) >= b.cfg.RateLimit || p.HasNextPage
 		b.fromItems(a, p.Items)
+		b.setLatest(a, p.Items)
 	}
 	b.fromItems(a, all.Items)
 
@@ -194,10 +199,50 @@ func (b *Builder) addTheses(ctx context.Context, a *notify.Alert, hint *fomo.Tok
 	}
 	a.First = notify.ThesesFrom(first[:min(b.cfg.FirstN, len(first))])
 	a.FirstExact = exact
+	if len(a.Latest) == 0 {
+		b.setLatest(a, all.Items)
+	}
+	b.rememberTheses(a, all.Items, recent, first)
 }
 
-// fromItems takes the token image and, when missing, the market cap at the
-// latest thesis.
+// rememberTheses keeps the fetched theses for the open token page.
+func (b *Builder) rememberTheses(a *notify.Alert, groups ...[]fomo.Thesis) {
+	if len(a.Theses) > 0 {
+		return
+	}
+	seen := map[string]bool{}
+	var items []fomo.Thesis
+	for _, g := range groups {
+		for _, t := range g {
+			key := t.CreatedAt.UTC().Format(time.RFC3339Nano) + "\n" + t.Handle + "\n" + t.Comment
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			items = append(items, t)
+		}
+	}
+	if len(items) == 0 {
+		return
+	}
+	a.Theses = notify.ThesesFrom(notify.SortByTime(items))
+}
+
+// setLatest keeps the newest theses, oldest first, for the feed row.
+func (b *Builder) setLatest(a *notify.Alert, items []fomo.Thesis) {
+	if len(items) == 0 || len(a.Latest) > 0 {
+		return
+	}
+	n := b.cfg.FirstN
+	if n <= 0 {
+		n = 3
+	}
+	sorted := notify.SortByTime(items)
+	if len(sorted) > n {
+		sorted = sorted[len(sorted)-n:]
+	}
+	a.Latest = notify.ThesesFrom(sorted)
+}
 func (b *Builder) fromItems(a *notify.Alert, items []fomo.Thesis) {
 	var latest fomo.Thesis
 	for _, t := range items {

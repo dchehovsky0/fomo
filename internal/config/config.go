@@ -205,7 +205,7 @@ type Web struct {
 	PublicURL string        `yaml:"public_url"`
 	PagesDir  string        `yaml:"pages_dir"`
 	Keep      time.Duration `yaml:"keep"`
-	// AdminToken protects /health/accounts when public_url is set.
+	// AdminToken protects /health/*, the watch board and /api/board when public_url is set.
 	AdminToken string `yaml:"admin_token"`
 }
 

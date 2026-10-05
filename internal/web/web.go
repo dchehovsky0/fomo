@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -49,6 +50,11 @@ type Server struct {
 	tmpl  *template.Template
 	log   *slog.Logger
 	admin map[string]http.Handler
+
+	feedMu    sync.Mutex
+	feedCache map[string]feedSnap
+	// dismissed is nil until the first read of dismissed.json.
+	dismissed map[string]struct{}
 }
 
 func New(cfg Config, loc *time.Location, log *slog.Logger) (*Server, error) {
@@ -111,6 +117,10 @@ func (s *Server) HandleAdmin(pattern string, h http.Handler) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /t/{id}", s.page)
+	mux.Handle("GET /{$}", s.requireAdmin(http.HandlerFunc(s.board)))
+	mux.Handle("GET /api/alerts", s.requireAdmin(http.HandlerFunc(s.alerts)))
+	mux.Handle("GET /api/alerts/{id}", s.requireAdmin(http.HandlerFunc(s.token)))
+	mux.Handle("POST /api/alerts/{id}/dismiss", s.requireAdmin(http.HandlerFunc(s.dismiss)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	for pattern, h := range s.admin {
 		mux.Handle(pattern, s.requireAdmin(h))
@@ -125,6 +135,11 @@ func (s *Server) requireAdmin(h http.Handler) http.Handler {
 			got := r.URL.Query().Get("token")
 			if v, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
 				got = v
+			}
+			if got == "" {
+				if c, err := r.Cookie(adminCookie); err == nil {
+					got = c.Value
+				}
 			}
 			if subtle.ConstantTimeCompare([]byte(got), []byte(s.cfg.AdminToken)) != 1 {
 				http.Error(w, "нужен токен: ?token=FOMO_ADMIN_TOKEN или заголовок Authorization: Bearer", http.StatusUnauthorized)
@@ -213,7 +228,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Robots-Tag", "noindex, nofollow")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Content-Security-Policy", "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'")
+	h.Set("Content-Security-Policy", "default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'")
 	w.Write(body.Bytes())
 }
 
@@ -253,7 +268,8 @@ func (s *Server) prune() {
 	limit := time.Now().Add(-s.cfg.Keep)
 	for _, e := range entries {
 		info, err := e.Info()
-		if err != nil || e.IsDir() || !strings.HasSuffix(e.Name(), ".json") || info.ModTime().After(limit) {
+		id := strings.TrimSuffix(e.Name(), ".json")
+		if err != nil || e.IsDir() || !idPattern.MatchString(id) || info.ModTime().After(limit) {
 			continue
 		}
 		os.Remove(filepath.Join(s.cfg.Dir, e.Name()))

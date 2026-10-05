@@ -179,6 +179,8 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 	health.SetWatching(w.Watching)
 	if pages != nil {
 		pages.HandleAdmin("GET /health/alerts", w.DelayHandler())
+		pages.HandleAdmin("GET /api/board", w.BoardHandler(cfg.Telegram.TokenLinkTemplate, cfg.Telegram.AxiomLinkTemplate))
+		pages.HandleAdmin("GET /api/watch/{mint}", w.LiveHandler(cfg.Telegram.TokenLinkTemplate, cfg.Telegram.AxiomLinkTemplate))
 	}
 	gate, err := newScreen(cfg, log)
 	if err != nil {
@@ -228,6 +230,7 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 	if pages != nil {
 		log.Info("fomo accounts status", "url", healthURL(cfg))
 		log.Info("process resources", "url", strings.TrimSuffix(healthURL(cfg), "/accounts")+"/resources")
+		log.Info("watch board", "url", strings.TrimSuffix(healthURL(cfg), "/health/accounts")+"/")
 		wg.Go(func() {
 			if err := pages.Run(ctx, webListen(cfg)); err != nil && ctx.Err() == nil {
 				log.Error("theses pages server stopped", "err", err)

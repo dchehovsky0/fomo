@@ -99,6 +99,12 @@ func TestCompleteHintNeedsNoRequests(t *testing.T) {
 	if a.Chain != "Solana" || a.Dex != "pumpfun" || a.CreatedAt.IsZero() || a.MarketCap != 4000 {
 		t.Errorf("alert = %+v", a)
 	}
+	if got := positions(a.Latest); len(got) != 3 || got[0] != 2 || got[1] != 3 || got[2] != 4 {
+		t.Errorf("latest = %v", got)
+	}
+	if got := positions(a.Theses); len(got) != 4 || got[0] != 1 || got[3] != 4 {
+		t.Errorf("theses = %v", got)
+	}
 	if a.FomoURL != "https://fomo.family/tokens/solana/MINT" || a.AxiomURL != "https://axiom.trade/meme/CURVE?chain=sol" {
 		t.Errorf("links: %s %s", a.FomoURL, a.AxiomURL)
 	}
@@ -122,6 +128,12 @@ func TestBigTokenFindsFirstTheses(t *testing.T) {
 
 	if got := positions(a.First); len(got) != 3 || got[0] != 1 || got[1] != 2 || got[2] != 3 || !a.FirstExact {
 		t.Fatalf("first = %v exact=%v", got, a.FirstExact)
+	}
+	if got := positions(a.Latest); len(got) != 3 || got[2] != 5000 {
+		t.Fatalf("latest = %v", got)
+	}
+	if got := positions(a.Theses); len(got) < 4 || got[0] != 1 || got[len(got)-1] != 5000 {
+		t.Fatalf("theses = %v", got)
 	}
 	if a.Count != 5000 || !a.RateKnown || a.Recent != 30 || a.RecentCapped {
 		t.Errorf("count=%d recent=%d capped=%v", a.Count, a.Recent, a.RecentCapped)

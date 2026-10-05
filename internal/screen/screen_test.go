@@ -38,9 +38,13 @@ func TestGateFiltersByMarketCap(t *testing.T) {
 	g.Add(domain.Token{Mint: "new", Symbol: "N", CreatedAt: now})
 
 	var got []string
-	g.wave(context.Background(), func(token domain.Token) { got = append(got, token.Mint) })
-	if len(got) != 1 || got[0] != "live" {
-		t.Fatalf("emitted %v", got)
+	var passed domain.Token
+	g.wave(context.Background(), func(token domain.Token) {
+		got = append(got, token.Mint)
+		passed = token
+	})
+	if len(got) != 1 || got[0] != "live" || passed.EntryMarketCap != 8000 {
+		t.Fatalf("emitted %v cap %v", got, passed.EntryMarketCap)
 	}
 	g.mu.Lock()
 	if _, ok := g.pending["dead"]; ok {

@@ -108,6 +108,19 @@ type item struct {
 	fails        int
 	failKind     string
 	failSpans    []span
+	// seen is the last fomo answer for this token: the texts the board
+	// shows when the operator opens it. The check goroutine writes it
+	// under mu; Board does not read it.
+	seen   []seenThesis
+	seenAt time.Time
+	image  string
+	// marketCap, volumeUSD and liquidityUSD are the latest DexScreener
+	// numbers. They start as the entry snapshot and move on each recheck
+	// while the token is still in tiers 1–3.
+	marketCap    float64
+	volumeUSD    float64
+	liquidityUSD float64
+	quoteAt      time.Time
 }
 
 // span is a stretch of time lost to one failed request or failed send,
@@ -192,7 +205,13 @@ func (w *Watcher) Add(l domain.Token) {
 		return
 	}
 	w.mu.Unlock()
-	it := &item{l: l, due: now, addedAt: now}
+	it := &item{
+		l: l, due: now, addedAt: now,
+		marketCap: l.EntryMarketCap, volumeUSD: l.EntryVolumeUSD, liquidityUSD: l.EntryLiquidityUSD,
+	}
+	if l.EntryMarketCap > 0 || l.EntryVolumeUSD > 0 || l.EntryLiquidityUSD > 0 {
+		it.quoteAt = now
+	}
 	if !w.syncTier(it, now) {
 		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "наблюдение этого токена уже закончено",
 			"token", l.Mint, "ticker", l.Symbol)
@@ -211,6 +230,30 @@ func (w *Watcher) Add(l domain.Token) {
 	w.mu.Unlock()
 	w.Stats.Added.Add(1)
 	w.poke()
+}
+
+// NoteQuote stores the latest DexScreener numbers for a token still being
+// watched. The entry snapshot on the token stays as it was at admission.
+func (w *Watcher) NoteQuote(mint string, marketCap, volume, liquidity float64, volumeKnown bool, image string, at time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	it := w.items[mint]
+	if it == nil || it.gone {
+		return
+	}
+	if marketCap > 0 {
+		it.marketCap = marketCap
+	}
+	if volumeKnown {
+		it.volumeUSD = volume
+	}
+	if liquidity > 0 {
+		it.liquidityUSD = liquidity
+	}
+	if picture := domain.PictureURL(image); picture != "" && it.image == "" && it.l.ImageURL == "" {
+		it.l.ImageURL = picture
+	}
+	it.quoteAt = at
 }
 
 // SetTiers turns on tier marks. Without it the watch runs as before.
@@ -439,12 +482,13 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	}
 	w.Stats.Checks.Add(1)
 	w.perAcc[acc].Add(1)
-	it.checks++
 	// count on this endpoint trails the items that are already in the body.
 	// Alerting on the field waits another poll or two after the thesis arrived.
 	seenN := page.Observed()
-	it.count = seenN
 	seen := time.Now()
+	// publishPage is the only checks++ for this answer. The board reads it
+	// under mu, and the log below runs after that write.
+	w.publishPage(it, page, seen)
 
 	if seenN >= w.cfg.MinTheses {
 		w.logCheck(acc, it, took, lag, "threshold", seenN, 0, nil, page)
@@ -454,9 +498,7 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	it.sawBelow = true
 	it.belowAt = seen
 	it.belowCount = seenN
-	it.fails = 0
-	it.failKind = ""
-	it.failSpans = nil
+	w.clearMiss(it)
 	every := w.interval(w.inWork(it, finished))
 	next := nextDue(now, finished, every)
 	if w.cfg.Lifetime > 0 && next.After(end) {
@@ -575,7 +617,12 @@ func (w *Watcher) syncTier(it *item, now time.Time) bool {
 				return false
 			}
 			if !entered.IsZero() {
+				// Board reads addedAt under mu. This is the only write after
+				// the item is published, and it happens on a restore from the
+				// database. mu is taken after tierMu; Board never takes tierMu.
+				w.mu.Lock()
 				it.addedAt = entered
+				w.mu.Unlock()
 			}
 			it.tier = tier
 			n = w.tierNumber(w.inWork(it, now))
@@ -635,6 +682,8 @@ func (w *Watcher) interval(age time.Duration) time.Duration {
 }
 
 func (w *Watcher) miss(it *item, kind string, from, to time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	it.fails++
 	it.failKind = kind
 	if to.After(from) {
@@ -670,6 +719,7 @@ func (w *Watcher) signal(ctx context.Context, it *item, page *fomo.TokenThesisPa
 	alert := notify.Alert{
 		Kind: notify.KindTheses, Threshold: w.cfg.MinTheses, Token: it.l.Mint, Symbol: ticker, Name: it.l.Name,
 		CreatedAt: it.l.CreatedAt, Dex: it.l.Dex, DetectedAt: now, CountKnown: true, Count: n,
+		Tier: w.tierNumber(w.inWork(it, now)),
 	}
 	asmStart := time.Now()
 	if w.cfg.Complete != nil {

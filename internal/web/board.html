@@ -1,0 +1,1304 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0d14">
+<title>Наблюдение</title>
+<style>
+:root {
+  --bg: #090b12; --card: #12151f; --card2: #181c2a; --line: #2a3148;
+  --text: #eef1f8; --muted: #8b93ab; --cyan: #22d3ee; --green: #34d399;
+  --blue: #60a5fa; --violet: #a78bfa; --gray: #94a3b8; --amber: #fbbf24; --red: #f87171;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; color: var(--text); }
+body {
+  font: 14px/1.5 "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(880px 420px at -8% -20%, rgba(34, 211, 238, .09), transparent 58%),
+    radial-gradient(720px 380px at 110% -10%, rgba(167, 139, 250, .1), transparent 52%),
+    var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+header {
+  display: flex; align-items: center; gap: 22px; padding: 16px 22px;
+  border-bottom: 1px solid rgba(42, 49, 72, .9);
+  background: rgba(12, 15, 24, .86);
+  backdrop-filter: blur(16px);
+}
+.brand { min-width: 220px; }
+.brand h1 { margin: 0; font-size: 20px; font-weight: 720; letter-spacing: -.3px; }
+.brand p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.searchwrap { flex: 1; max-width: 520px; position: relative; }
+.search { display: flex; align-items: center; }
+.search input {
+  width: 100%; background: rgba(8, 10, 16, .7); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px; outline: none; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.search input:focus { border-color: rgba(34, 211, 238, .55); box-shadow: 0 0 0 3px rgba(34, 211, 238, .12); }
+.live {
+  margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
+  white-space: nowrap; background: rgba(18, 21, 31, .9); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 12px;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gray); box-shadow: 0 0 0 4px rgba(148, 163, 184, .12); }
+.live.ok .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(52, 211, 153, .16); }
+.live.bad .dot { background: var(--red); box-shadow: 0 0 0 4px rgba(248, 113, 113, .16); }
+.layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-items: start; }
+aside {
+  align-self: start; position: sticky; top: 0;
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+  border-right: 1px solid var(--line);
+}
+.card {
+  flex: 0 0 auto; position: relative;
+  text-align: left; cursor: pointer; border-radius: 14px; padding: 12px 14px 12px 30px;
+  background: rgba(18, 21, 31, .92); border: 1px solid var(--line); display: grid;
+  grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.card::before {
+  content: ""; position: absolute; left: 12px; top: 18px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gray);
+}
+.card.feed::before { background: var(--cyan); box-shadow: 0 0 10px rgba(34, 211, 238, .65); }
+.card.t1::before { background: var(--green); box-shadow: 0 0 10px rgba(52, 211, 153, .5); }
+.card.t2::before { background: var(--blue); box-shadow: 0 0 10px rgba(96, 165, 250, .5); }
+.card.t3::before { background: var(--violet); box-shadow: 0 0 10px rgba(167, 139, 250, .5); }
+.card.t4::before { background: var(--gray); }
+.card:hover { border-color: #3d4666; }
+.card.on { background: #102028; border-color: rgba(34, 211, 238, .55); box-shadow: 0 8px 24px rgba(0, 0, 0, .28); }
+.card.t1.on { background: #0e221c; border-color: rgba(52, 211, 153, .55); }
+.card.t2.on { background: #101c30; border-color: rgba(96, 165, 250, .55); }
+.card.t3.on { background: #1a1630; border-color: rgba(167, 139, 250, .55); }
+.card.t4.on { background: #1a1e28; border-color: rgba(148, 163, 184, .55); }
+.card .name { font-weight: 650; }
+.card .meta { grid-column: 1; color: var(--muted); font-size: 12px; }
+.card .n { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 18px; }
+.card .n small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); text-align: right; }
+main { min-width: 0; display: flex; flex-direction: column; }
+.note { color: var(--muted); font-size: 12px; padding: 14px 18px 0; }
+.filters { display: flex; gap: 10px; padding: 14px 18px; flex-wrap: wrap; }
+.filters label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.filters select {
+  background: rgba(18, 21, 31, .92); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; min-width: 168px;
+  outline: none;
+}
+.filters select:focus { border-color: rgba(34, 211, 238, .55); box-shadow: 0 0 0 3px rgba(34, 211, 238, .12); }
+.tablewrap { overflow: auto; flex: 1; padding: 0 8px 16px; }
+table { width: 100%; border-collapse: collapse; min-width: 820px; }
+th, td { padding: 13px 14px; text-align: left; border-bottom: 1px solid rgba(42, 49, 72, .75); vertical-align: middle; }
+th {
+  position: sticky; top: 0; z-index: 2; background: rgba(9, 11, 18, .94); color: var(--muted);
+  font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
+}
+th:first-child, td.tok { position: sticky; left: 0; }
+th:first-child { z-index: 3; }
+td.tok { background: var(--bg); z-index: 1; }
+tbody tr:hover td { background: rgba(20, 24, 38, .92); }
+.tok { display: flex; gap: 12px; align-items: center; }
+.av {
+  width: 36px; height: 36px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  font-weight: 750; color: #fff; background: hsl(var(--h), 52%, 42%);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .06), 0 6px 16px rgba(0, 0, 0, .28);
+}
+.sym { font-weight: 700; color: var(--text); text-decoration: none; }
+a.sym:hover { color: var(--cyan); }
+.sub { color: var(--muted); font-size: 12px; }
+.sub a { color: var(--muted); }
+.fail { color: var(--amber); }
+.tier {
+  display: inline-block; min-width: 52px; text-align: center; border-radius: 999px; padding: 3px 8px;
+  font-size: 12px; font-weight: 700; background: var(--card2); border: 1px solid var(--line);
+}
+.tier.t1 { color: var(--green); background: rgba(52, 211, 153, .1); border-color: rgba(52, 211, 153, .35); }
+.tier.t2 { color: var(--blue); background: rgba(96, 165, 250, .1); border-color: rgba(96, 165, 250, .35); }
+.tier.t3 { color: var(--violet); background: rgba(167, 139, 250, .12); border-color: rgba(167, 139, 250, .35); }
+.tier.t4 { color: var(--gray); background: rgba(148, 163, 184, .08); }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.empty { padding: 48px 16px; text-align: center; color: var(--muted); }
+.texts { color: var(--cyan); font-weight: 650; text-decoration: none; white-space: nowrap; }
+.texts:hover { text-decoration: underline; }
+#feedView table, #feedView thead, #feedView tbody { display: block; width: 100%; }
+#feedView thead { position: sticky; top: 0; z-index: 2; background: rgba(9, 11, 18, .94); }
+button.sym:hover { color: var(--cyan); }
+#feedView thead tr, .callgrid {
+  display: grid; min-width: 980px; align-items: start;
+  grid-template-columns: minmax(220px, 250px) minmax(420px, 1fr) max-content max-content 100px;
+}
+#feedView th { position: static; }
+.calltd { position: relative; overflow: hidden; padding: 0; display: block; }
+.under {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 22px; background: linear-gradient(90deg, transparent, #4a1524 28%); color: #fecdd3; font-weight: 700;
+}
+.sheet { position: relative; background: rgba(14, 17, 26, .72); touch-action: pan-y; }
+#feedView tbody tr:hover .sheet { background: rgba(22, 27, 42, .95); }
+.callgrid > * { min-width: 0; padding: 11px 14px; }
+.actions { display: flex; gap: 2px; align-items: center; padding-top: 8px; }
+.closecall {
+  width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.closecall:hover { background: #3a1420; color: var(--red); }
+#feedView .tok { align-items: flex-start; }
+.av { position: relative; overflow: hidden; }
+.av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tokmeta { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.snips { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); gap: 16px; }
+.snip { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+.mark { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
+.txt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+.ago { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.capbig { font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.alertwhen { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.more {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
+  color: var(--muted); text-decoration: none; font-weight: 700; letter-spacing: 1px;
+}
+.more:hover { background: var(--card2); color: var(--text); }
+button.sym { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; }
+#hits {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  max-height: 260px; overflow: auto;
+}
+.hit { display: block; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid #1c2233; padding: 8px 12px; cursor: pointer; }
+.hit:hover { background: var(--card2); }
+.back {
+  margin: 16px 18px 0; background: rgba(18, 21, 31, .92); border: 1px solid var(--line); color: var(--cyan);
+  cursor: pointer; padding: 7px 12px; border-radius: 999px; font-weight: 650;
+}
+.back:hover { border-color: rgba(34, 211, 238, .45); }
+.tokenhead { display: flex; gap: 16px; align-items: center; padding: 16px 18px 0; }
+.tokenhead .av { width: 56px; height: 56px; font-size: 22px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 16px 18px; }
+.stat {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .035), transparent 46%), var(--card);
+  border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px;
+}
+.stat .k { color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.stat .v { font-size: 22px; font-weight: 750; margin-top: 6px; font-variant-numeric: tabular-nums; letter-spacing: -.3px; }
+.stat .s { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.tlist { display: flex; flex-direction: column; gap: 8px; padding: 0 18px 28px; }
+.trow {
+  display: grid; grid-template-columns: 16px minmax(0, 1fr) max-content max-content;
+  gap: 14px; align-items: start; padding: 14px 16px;
+  background: rgba(18, 21, 31, .88); border: 1px solid var(--line); border-radius: 16px;
+}
+.trow:hover { border-color: #3d4666; background: #151926; }
+.ttext { white-space: pre-wrap; }
+.copy {
+  margin-left: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--muted);
+  border-radius: 999px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+}
+.copy:hover { color: var(--text); border-color: #3d4666; }
+@media (max-width: 860px) {
+  header { flex-wrap: wrap; gap: 10px; }
+  .searchwrap { max-width: none; order: 3; flex: 1 1 100%; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .live { margin-left: 0; }
+  .layout { grid-template-columns: 1fr; }
+  aside { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .card { min-width: 200px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Наблюдение</h1>
+    <p id="sub">Токены, которые бот сейчас спрашивает у FOMO</p>
+  </div>
+  <div class="searchwrap">
+    <label class="search">
+      <input id="q" type="search" placeholder="Тикер, имя или контракт" autocomplete="off" aria-label="Поиск">
+    </label>
+    <div id="hits" hidden></div>
+  </div>
+  <div class="live" id="live"><span class="dot"></span><span id="liveText">подключаемся</span></div>
+</header>
+<div class="layout">
+  <aside id="tiers"></aside>
+  <main>
+    <div class="note" id="note"></div>
+    <div id="watchView">
+      <div class="filters">
+        <label>Тир
+          <select id="tier" aria-label="Тир"></select>
+        </label>
+        <label>Сортировка
+          <select id="sort" aria-label="Сортировка">
+            <option value="age">Сначала новые</option>
+            <option value="age_old">Сначала старые</option>
+            <option value="theses">По числу тезисов</option>
+            <option value="cap">По капе</option>
+            <option value="vol">По объёму</option>
+          </select>
+        </label>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Токен</th><th>Тир</th><th>Капа</th><th>Объём</th><th>Ликвидность</th>
+              <th>В наблюдении</th><th>В тире ещё</th><th>Тезисы</th><th>Опрос</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden></div>
+      </div>
+    </div>
+    <div id="feedView" hidden>
+      <div class="filters">
+        <label>Время
+          <select id="range" aria-label="Время">
+            <option value="1h">1 час</option>
+            <option value="6h">6 часов</option>
+            <option value="24h" selected>24 часа</option>
+            <option value="7d">7 дней</option>
+            <option value="all">Всё время</option>
+          </select>
+        </label>
+        <label>Сортировка
+          <select id="feedSort" aria-label="Сортировка ленты">
+            <option value="new">Сначала новые</option>
+            <option value="old">Сначала старые</option>
+            <option value="theses">По числу тезисов</option>
+            <option value="cap">По капе</option>
+          </select>
+        </label>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Токен</th>
+              <th>Тезисы · 3 последних</th>
+              <th>Капа</th>
+              <th>Алерт</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="feedRows"></tbody>
+        </table>
+        <div class="empty" id="feedEmpty" hidden></div>
+      </div>
+    </div>
+    <div id="tokenView" hidden>
+      <button type="button" class="back" id="backFeed">← К ленте</button>
+      <div class="tokenhead" id="tokenHead"></div>
+      <div class="stats" id="tokenStats"></div>
+      <div class="filters">
+        <label>Порядок
+          <select id="thesisSort" aria-label="Порядок тезисов">
+            <option value="new">Сначала новые</option>
+            <option value="old">Сначала старые</option>
+            <option value="pos">Больше позиция</option>
+            <option value="pos_small">Меньше позиция</option>
+          </select>
+        </label>
+      </div>
+      <div class="tlist" id="tokenTheses"></div>
+      <div class="empty" id="tokenEmpty" hidden></div>
+    </div>
+  </main>
+</div>
+<script>
+const fails = { auth: "аккаунт не пустил", retry: "fomo недоступен", error: "ошибка запроса", send: "алерт не ушёл" };
+const ranges = { "1h": 3600000, "6h": 21600000, "24h": 86400000, "7d": 604800000, all: 0 };
+let view = "watch";
+let data = null;
+let feed = null;
+let tokenId = "";
+let tokenKind = "";
+let tokenDetail = null;
+const gone = new Set();
+let fetchedAt = 0;
+let seq = 0;
+let poll = 0;
+let tickTimer = 0;
+
+function dur(ms) {
+  const neg = ms < 0;
+  let sec = Math.round(Math.abs(ms) / 1000);
+  const parts = [];
+  const d = Math.floor(sec / 86400); sec %= 86400;
+  const h = Math.floor(sec / 3600); sec %= 3600;
+  const m = Math.floor(sec / 60); sec %= 60;
+  if (d && !h && !m && !sec && d <= 2) return (neg ? "−" : "") + (d * 24) + " ч";
+  if (d) parts.push(d + " д");
+  if (h && parts.length < 2) parts.push(h + " ч");
+  if (m && parts.length < 2) parts.push(m + " мин");
+  if (!parts.length) parts.push(sec + " с");
+  else if (!d && sec && parts.length < 2) parts.push(sec + " с");
+  return (neg ? "−" : "") + parts.join(" ");
+}
+function every(ms) {
+  if (!ms) return "—";
+  return "каждые " + dur(ms);
+}
+function elapsed() { return data ? Date.now() - fetchedAt : 0; }
+function shortMint(m) {
+  if (!m) return "—";
+  if (m.length <= 12) return m;
+  return m.slice(0, 4) + "…" + m.slice(-4);
+}
+function safeURL(u) {
+  if (!u) return "";
+  let s = String(u).trim();
+  if (s.startsWith("ipfs://")) s = "https://ipfs.io/ipfs/" + s.slice(7).replace(/^ipfs\//, "");
+  try {
+    const x = new URL(s);
+    if (x.protocol === "https:" || x.protocol === "http:") return x.href;
+  } catch (e) {}
+  return "";
+}
+function placeImage(av, symbol, image) {
+  if (!av) return;
+  const url = safeURL(image);
+  const cur = av.querySelector("img");
+  if (cur && cur.getAttribute("src") === url) return;
+  av.textContent = (symbol || "?").slice(0, 1).toUpperCase();
+  if (!url) return;
+  const img = document.createElement("img");
+  img.src = url;
+  img.alt = "";
+  img.referrerPolicy = "no-referrer";
+  img.addEventListener("error", () => img.remove());
+  av.append(img);
+}
+function hue(s) {
+  let h = 0;
+  for (const c of s || "?") h = (h * 33 + c.codePointAt(0)) >>> 0;
+  return h % 360;
+}
+function selectedTier() { return Number(document.getElementById("tier").value) || 0; }
+
+function fillTierSelect() {
+  const sel = document.getElementById("tier");
+  const cur = sel.value || "0";
+  const want = ["0", ...((data && data.tiers) || []).map(t => String(t.tier))];
+  if ([...sel.options].map(o => o.value).join() === want.join()) return;
+  sel.replaceChildren();
+  const all = document.createElement("option");
+  all.value = "0"; all.textContent = "Все тиры";
+  sel.appendChild(all);
+  for (const t of (data && data.tiers) || []) {
+    const o = document.createElement("option");
+    o.value = String(t.tier);
+    o.textContent = "Тир " + t.tier;
+    sel.appendChild(o);
+  }
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : "0";
+}
+
+function renderTiers() {
+  const box = document.getElementById("tiers");
+  const cur = selectedTier();
+  const items = [
+    { view: "feed", tier: 0, name: "Лента", meta: "отправленные алерты", n: feedCount(), cls: "feed" },
+    { view: "watch", tier: 0, name: "Все тиры", meta: "сейчас в наблюдении", n: (data && data.watching) || 0, cls: "" }
+  ];
+  for (const t of (data && data.tiers) || []) {
+    items.push({ view: "watch", tier: t.tier, name: "Тир " + t.tier, meta: "длится " + dur(t.lasts_ms) + " · " + every(t.every_ms), n: t.tokens, cls: "t" + t.tier });
+  }
+  if (box.childElementCount !== items.length) {
+    const left = box.scrollLeft;
+    box.replaceChildren();
+    for (const it of items) box.appendChild(tierButton(it));
+    box.scrollLeft = left;
+  }
+  items.forEach((it, i) => {
+    const b = box.children[i];
+    const on = view === it.view && (it.view === "feed" || cur === it.tier);
+    b.querySelector(".name").textContent = it.name;
+    b.querySelector(".meta").textContent = it.meta;
+    b.querySelector(".n").textContent = String(it.n);
+    b.className = "card" + (it.cls ? " " + it.cls : "") + (on ? " on" : "");
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+function tierButton(it) {
+  const b = card(it.name, it.meta, it.n, false, it.cls);
+  const mode = it.view;
+  const tier = it.tier;
+  b.addEventListener("click", () => { if (mode === "feed") pickFeed(); else pickTier(tier); });
+  return b;
+}
+function card(name, meta, n, on, cls) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "card" + (cls ? " " + cls : "") + (on ? " on" : "");
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+  const nm = document.createElement("div"); nm.className = "name"; nm.textContent = name;
+  const c = document.createElement("div"); c.className = "n"; c.textContent = String(n);
+  const m = document.createElement("div"); m.className = "meta"; m.textContent = meta;
+  b.append(nm, c, m);
+  return b;
+}
+function pickFeed() {
+  view = "feed";
+  applyView();
+  renderTiers();
+  renderFeed();
+}
+function pickTier(n) {
+  view = "watch";
+  document.getElementById("tier").value = String(n);
+  applyView();
+  renderTiers();
+  renderRows();
+}
+function applyView() {
+  document.getElementById("watchView").hidden = view !== "watch";
+  document.getElementById("feedView").hidden = view !== "feed";
+  document.getElementById("tokenView").hidden = view !== "token";
+  document.getElementById("hits").hidden = view !== "token" || !feedQuery();
+  document.getElementById("sub").textContent = view === "token"
+    ? (tokenKind === "watch" ? "Токен в наблюдении" : "Открытый токен")
+    : view === "feed"
+    ? "Отправленные алерты и три последних тезиса"
+    : "Токены, которые бот сейчас спрашивает у FOMO";
+  document.getElementById("q").placeholder = "Тикер, имя или контракт";
+  renderNote();
+  if (view === "token") renderHits();
+}
+
+function shown() {
+  if (!data) return [];
+  const tier = selectedTier();
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  let rows = (data.tokens || []).filter(t => {
+    if (tier && t.tier !== tier) return false;
+    if (!q) return true;
+    return [t.symbol, t.name, t.mint, t.dex, t.deployer].join(" ").toLowerCase().includes(q);
+  });
+  const sort = document.getElementById("sort").value;
+  const age = t => t.age_ms + elapsed();
+  const key = {
+    age: (a, b) => age(a) - age(b),
+    age_old: (a, b) => age(b) - age(a),
+    theses: (a, b) => (b.theses - a.theses) || (age(a) - age(b)),
+    cap: (a, b) => ((b.market_cap || 0) - (a.market_cap || 0)) || (age(a) - age(b)),
+    vol: (a, b) => ((b.volume_usd || 0) - (a.volume_usd || 0)) || (age(a) - age(b))
+  }[sort] || ((a, b) => age(a) - age(b));
+  rows.sort(key);
+  return rows;
+}
+
+function renderRows() {
+  if (!data) return;
+  const body = document.getElementById("rows");
+  const empty = document.getElementById("empty");
+  const rows = shown();
+  const filtered = selectedTier() || document.getElementById("q").value.trim();
+  if (!rows.length) {
+    body.replaceChildren();
+    empty.hidden = false;
+    empty.textContent = filtered ? "Ничего не нашлось по этому фильтру." : "Сейчас ни одного токена в наблюдении.";
+    return;
+  }
+  empty.hidden = true;
+  const have = new Map([...body.children].map(tr => [tr.dataset.mint, tr]));
+  const frag = document.createDocumentFragment();
+  for (const t of rows) {
+    const tr = have.get(t.mint);
+    if (tr) paint(tr, t);
+    frag.appendChild(tr || row(t));
+  }
+  body.replaceChildren(frag);
+  tick();
+}
+function paint(tr, t) {
+  const tier = tr.querySelector(".tier");
+  tier.className = "tier t" + t.tier;
+  tier.textContent = "Тир " + t.tier;
+  const bases = [t.age_ms, t.left_ms];
+  tr.querySelectorAll("[data-tick]").forEach((el, i) => { el.dataset.base = String(bases[i]); });
+  const theses = tr.querySelector("[data-theses]");
+  theses.textContent = t.checked ? (t.theses + " / " + (data.need || 0)) : "—";
+  theses.title = t.checked ? "" : "ещё не спрашивали";
+  tr.querySelector("[data-every]").textContent = every(t.every_ms);
+  const cap = tr.querySelector("[data-cap]");
+  cap.textContent = usd(t.market_cap);
+  cap.title = t.entry_market_cap ? "на входе " + usd(t.entry_market_cap) : "";
+  const vol = tr.querySelector("[data-vol]");
+  vol.textContent = usd(t.volume_usd);
+  vol.title = [t.entry_volume_usd ? "на входе " + usd(t.entry_volume_usd) : "", "объём за 24 ч"].filter(Boolean).join(" · ");
+  const liq = tr.querySelector("[data-liq]");
+  liq.textContent = usd(t.liquidity_usd);
+  liq.title = t.entry_liquidity_usd ? "на входе " + usd(t.entry_liquidity_usd) : "";
+  fillAvatar(tr.querySelector(".av"), t);
+  const who = tr.querySelector(".who");
+  let fail = who.querySelector(".fail");
+  const msg = t.fail_kind ? (fails[t.fail_kind] || t.fail_kind) : "";
+  if (msg) {
+    if (!fail) {
+      fail = document.createElement("div");
+      fail.className = "sub fail";
+      who.append(fail);
+    }
+    fail.textContent = msg;
+  } else if (fail) fail.remove();
+}
+function row(t) {
+  const tr = document.createElement("tr");
+  tr.dataset.mint = t.mint;
+  const td = document.createElement("td");
+  td.className = "tok";
+  const av = document.createElement("div");
+  av.className = "av";
+  av.style.setProperty("--h", hue(t.mint || t.symbol));
+  fillAvatar(av, t);
+  const text = document.createElement("div");
+  text.className = "who";
+  const sym = document.createElement("button");
+  sym.type = "button";
+  sym.className = "sym";
+  sym.textContent = t.symbol || shortMint(t.mint);
+  sym.addEventListener("click", () => openWatch(t.mint));
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.style.cursor = "pointer";
+  sub.textContent = t.name || shortMint(t.mint);
+  if (t.dex) sub.textContent += " · " + t.dex;
+  sub.addEventListener("click", () => openWatch(t.mint));
+  const addr = document.createElement("div");
+  addr.className = "sub";
+  const fomo = safeURL(t.fomo_url);
+  if (fomo) {
+    const fomoLink = document.createElement("a");
+    fomoLink.href = fomo; fomoLink.target = "_blank"; fomoLink.rel = "noreferrer noopener"; fomoLink.textContent = "fomo";
+    addr.append(fomoLink);
+  }
+  const ax = safeURL(t.axiom_url);
+  if (ax) {
+    const a = document.createElement("a");
+    a.href = ax; a.target = "_blank"; a.rel = "noreferrer noopener"; a.textContent = "axiom";
+    if (addr.childNodes.length) addr.append(document.createTextNode(" · "));
+    addr.append(a);
+  }
+  text.append(sym, sub);
+  if (addr.childNodes.length) text.append(addr);
+  if (t.fail_kind) {
+    const f = document.createElement("div");
+    f.className = "sub fail";
+    f.textContent = fails[t.fail_kind] || t.fail_kind;
+    text.append(f);
+  }
+  td.append(av, text);
+  const capCell = cell(usd(t.market_cap));
+  capCell.dataset.cap = "1";
+  capCell.title = t.entry_market_cap ? "на входе " + usd(t.entry_market_cap) : "";
+  const volCell = cell(usd(t.volume_usd));
+  volCell.dataset.vol = "1";
+  volCell.title = [t.entry_volume_usd ? "на входе " + usd(t.entry_volume_usd) : "", "объём за 24 ч"].filter(Boolean).join(" · ");
+  const liqCell = cell(usd(t.liquidity_usd));
+  liqCell.dataset.liq = "1";
+  liqCell.title = t.entry_liquidity_usd ? "на входе " + usd(t.entry_liquidity_usd) : "";
+  const everyCell = cell(every(t.every_ms));
+  everyCell.dataset.every = "1";
+  tr.append(td, cellTier(t), capCell, volCell, liqCell, tickCell("up", t.age_ms), tickCell("down", t.left_ms), cellTheses(t), everyCell);
+  return tr;
+}
+function fillAvatar(av, t) {
+  placeImage(av, t.symbol, t.image_url);
+}
+function cell(text) {
+  const td = document.createElement("td");
+  td.className = "num";
+  td.textContent = text;
+  return td;
+}
+function cellTier(t) {
+  const td = document.createElement("td");
+  const s = document.createElement("span");
+  s.className = "tier t" + t.tier;
+  s.textContent = "Тир " + t.tier;
+  td.append(s);
+  return td;
+}
+function cellTheses(t) {
+  const td = cell(t.checked ? (t.theses + " / " + (data.need || 0)) : "—");
+  td.dataset.theses = "1";
+  if (!t.checked) td.title = "ещё не спрашивали";
+  return td;
+}
+function tickCell(kind, base) {
+  const td = cell("");
+  td.dataset.tick = kind;
+  td.dataset.base = String(base);
+  return td;
+}
+function tick() {
+  const e = elapsed();
+  for (const el of document.querySelectorAll("[data-tick]")) {
+    const base = Number(el.dataset.base);
+    if (el.dataset.tick === "up") el.textContent = dur(Math.max(0, base + e));
+    else el.textContent = dur(Math.max(0, base - e));
+  }
+  for (const el of document.querySelectorAll("[data-ago]")) el.textContent = ago(el.dataset.ago);
+}
+
+function renderNote() {
+  if (view === "token") {
+    document.getElementById("note").textContent = tokenKind === "watch"
+      ? "Тезисы — последний опрос fomo. Капа, объём и ликвидность — DexScreener: снимок на входе и последнее обновление."
+      : "Тезисы, сохранённые с колом. Порядок — по возрасту или по размеру позиции.";
+    return;
+  }
+  if (view === "feed") {
+    document.getElementById("note").textContent = "Три последних тезиса и капа — на момент кола. Крестик или смахивание влево убирает его из ленты, страница с текстами остаётся.";
+    return;
+  }
+  const n = data && data.need;
+  document.getElementById("note").textContent = n
+    ? "Алерт уходит, когда тезисов становится " + n + ". Капа, объём и ликвидность обновляются с DexScreener, пока токен в тирах 1–3. Наведите на цифру — снимок на входе."
+    : "";
+}
+function rangeMs() { return ranges[document.getElementById("range").value] || 0; }
+function feedQuery() { return document.getElementById("q").value.trim().toLowerCase(); }
+function feedItems() {
+  return ((feed && feed.alerts) || []).filter(a => !gone.has(a.id));
+}
+function feedCount() {
+  const all = feedItems();
+  const ms = rangeMs();
+  if (!ms) return all.length;
+  const now = Date.now();
+  return all.filter(a => now - new Date(a.at).getTime() <= ms).length;
+}
+function shownFeed() {
+  const all = feedItems();
+  const ms = rangeMs();
+  const q = feedQuery();
+  const now = Date.now();
+  const rows = all.filter(a => {
+    if (ms && now - new Date(a.at).getTime() > ms) return false;
+    if (!q) return true;
+    return [a.symbol, a.name, a.mint, a.dex, ...(a.snippets || []).map(s => s.text)].join(" ").toLowerCase().includes(q);
+  });
+  const at = a => new Date(a.at).getTime() || 0;
+  const key = {
+    new: (a, b) => at(b) - at(a),
+    old: (a, b) => at(a) - at(b),
+    theses: (a, b) => (b.theses - a.theses) || (at(b) - at(a)),
+    cap: (a, b) => (b.market_cap - a.market_cap) || (at(b) - at(a))
+  }[document.getElementById("feedSort").value] || ((a, b) => at(b) - at(a));
+  rows.sort(key);
+  return rows;
+}
+function usd(v) {
+  if (!v) return "—";
+  const abs = Math.abs(v);
+  const units = [[1e9, "B"], [1e6, "M"], [1e3, "K"]];
+  for (const [size, suf] of units) {
+    if (abs < size) continue;
+    const n = Math.round(abs / size * 10) / 10;
+    return (v < 0 ? "−" : "") + "$" + String(n).replace(/\.0$/, "") + suf;
+  }
+  return (v < 0 ? "−" : "") + "$" + Math.round(abs);
+}
+function ago(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return "";
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return s + " с назад";
+  const m = Math.round(s / 60);
+  if (m < 60) return m + " мин назад";
+  const h = Math.round(m / 60);
+  if (h < 48) return h + " ч назад";
+  return Math.round(h / 24) + " д назад";
+}
+function clock(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const hm = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (d.toDateString() === new Date().toDateString()) return hm;
+  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }) + " " + hm;
+}
+function renderFeed() {
+  const body = document.getElementById("feedRows");
+  const empty = document.getElementById("feedEmpty");
+  const rows = shownFeed();
+  if (!rows.length) {
+    body.replaceChildren();
+    empty.hidden = false;
+    empty.textContent = feedQuery() ? "Ничего не нашлось по этому фильтру." : "За это время алертов не было.";
+    return;
+  }
+  empty.hidden = true;
+  const have = new Map([...body.children].map(tr => [tr.dataset.id, tr]));
+  const frag = document.createDocumentFragment();
+  for (const a of rows) {
+    const tr = have.get(a.id);
+    if (tr) paintFeed(tr, a);
+    frag.appendChild(tr || feedRow(a));
+  }
+  body.replaceChildren(frag);
+}
+function paintFeed(tr, a) {
+  tr.querySelector("[data-clock]").textContent = clock(a.at);
+  const agoEl = tr.querySelector("[data-ago].alertago");
+  agoEl.dataset.ago = a.at || "";
+  agoEl.textContent = ago(a.at);
+  const cap = tr.querySelector("[data-cap]");
+  cap.textContent = usd(a.market_cap);
+  cap.title = a.market_cap ? "капа в момент алерта" : "";
+  fillSnips(tr.querySelector(".snips"), a.snippets || []);
+}
+const dotColors = ["var(--green)", "var(--cyan)", "var(--violet)"];
+function fillSnips(box, snippets) {
+  box.replaceChildren();
+  for (let i = 0; i < 3; i++) box.append(snipCell(snippets[i], i));
+}
+function snipCell(t, i) {
+  const el = document.createElement("div");
+  el.className = "snip";
+  if (!t) {
+    const dash = document.createElement("div");
+    dash.className = "sub";
+    dash.textContent = "—";
+    el.append(dash);
+    return el;
+  }
+  const mark = document.createElement("span");
+  mark.className = "mark";
+  mark.style.background = dotColors[i] || "var(--green)";
+  const body = document.createElement("div");
+  const text = document.createElement("div");
+  text.className = "txt";
+  text.textContent = t.text;
+  text.title = t.handle ? t.handle + ": " + t.text : t.text;
+  const when = document.createElement("div");
+  when.className = "ago";
+  when.dataset.ago = t.at || "";
+  when.textContent = ago(t.at);
+  body.append(text, when);
+  el.append(mark, body);
+  return el;
+}
+function feedRow(a) {
+  const tr = document.createElement("tr");
+  tr.className = "call";
+  tr.dataset.id = a.id;
+  const td = document.createElement("td");
+  td.className = "calltd";
+  td.colSpan = 5;
+  const under = document.createElement("div");
+  under.className = "under";
+  under.textContent = "Закрыть";
+  const sheet = document.createElement("div");
+  sheet.className = "sheet";
+  const grid = document.createElement("div");
+  grid.className = "callgrid";
+  grid.append(tokenCell(a), thesisCell(a), capCell(a), whenCell(a), moreCell(a));
+  sheet.append(grid);
+  td.append(under, sheet);
+  tr.append(td);
+  bindSwipe(tr);
+  return tr;
+}
+function dismissCall(id) {
+  if (!id || gone.has(id)) return;
+  gone.add(id);
+  const tr = document.querySelector('#feedRows tr[data-id="' + CSS.escape(id) + '"]');
+  const sheet = tr && tr.querySelector(".sheet");
+  if (sheet) {
+    sheet.style.transition = "transform .18s ease";
+    sheet.style.transform = "translateX(-100%)";
+  }
+  renderTiers();
+  setTimeout(() => { renderFeed(); }, 180);
+  fetch("/api/alerts/" + encodeURIComponent(id) + "/dismiss", { method: "POST" }).then(res => {
+    if (!res.ok) throw new Error(String(res.status));
+  }).catch(() => {
+    gone.delete(id);
+    renderFeed();
+    renderTiers();
+  });
+}
+function bindSwipe(tr) {
+  const sheet = tr.querySelector(".sheet");
+  let startX = 0, startY = 0, dx = 0, tracking = false, horizontal = false, dragged = false;
+  sheet.addEventListener("dragstart", (e) => e.preventDefault());
+  sheet.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest("button")) return;
+    tracking = true;
+    horizontal = false;
+    dragged = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    dx = 0;
+    sheet.style.transition = "none";
+  });
+  sheet.addEventListener("pointermove", (e) => {
+    if (!tracking) return;
+    const x = e.clientX - startX;
+    const y = e.clientY - startY;
+    if (!horizontal) {
+      if (Math.abs(x) < 8 && Math.abs(y) < 8) return;
+      if (Math.abs(y) > Math.abs(x)) { tracking = false; sheet.style.transform = ""; return; }
+      horizontal = true;
+      dragged = true;
+      try { sheet.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    dx = Math.min(0, x);
+    sheet.style.transform = "translateX(" + dx + "px)";
+  });
+  const end = () => {
+    if (!tracking && !horizontal) return;
+    tracking = false;
+    sheet.style.transition = "transform .18s ease";
+    if (dx < -72) dismissCall(tr.dataset.id);
+    else sheet.style.transform = "";
+    dx = 0;
+    horizontal = false;
+  };
+  sheet.addEventListener("pointerup", end);
+  sheet.addEventListener("pointercancel", end);
+  sheet.addEventListener("click", (e) => {
+    if (!dragged) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragged = false;
+  }, true);
+}
+function tokenCell(a) {
+  const td = document.createElement("div");
+  const row = document.createElement("div");
+  row.className = "tok";
+  if (a.tier) {
+    const tier = document.createElement("span");
+    tier.className = "tier t" + a.tier;
+    tier.textContent = "Тир " + a.tier;
+    row.append(tier);
+  }
+  const av = document.createElement("div");
+  av.className = "av";
+  av.style.setProperty("--h", hue(a.mint || a.symbol));
+  placeImage(av, a.symbol, a.image_url);
+  const text = document.createElement("div");
+  const sym = document.createElement("button");
+  sym.type = "button";
+  sym.className = "sym";
+  sym.textContent = a.symbol || shortMint(a.mint);
+  sym.addEventListener("click", () => openToken(a.id));
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.style.cursor = "pointer";
+  sub.textContent = a.name || shortMint(a.mint);
+  sub.addEventListener("click", () => openToken(a.id));
+  if (a.dex) sub.textContent += " · " + a.dex;
+  if (a.kind === "trending") sub.textContent += " · trending";
+  const addr = document.createElement("div");
+  addr.className = "sub";
+  const bits = [];
+  if (a.chain) bits.push(a.chain);
+  if (a.mint) bits.push(shortMint(a.mint));
+  addr.textContent = bits.join(" · ");
+  if (a.mint) addr.title = a.mint;
+  const fomo = safeURL(a.fomo_url);
+  if (fomo) {
+    const fomoLink = document.createElement("a");
+    fomoLink.href = fomo; fomoLink.target = "_blank"; fomoLink.rel = "noreferrer noopener"; fomoLink.textContent = "fomo";
+    addr.append(document.createTextNode(bits.length ? " · " : ""), fomoLink);
+  }
+  const ax = safeURL(a.axiom_url);
+  if (ax) {
+    const axLink = document.createElement("a");
+    axLink.href = ax; axLink.target = "_blank"; axLink.rel = "noreferrer noopener"; axLink.textContent = "axiom";
+    addr.append(document.createTextNode(addr.childNodes.length ? " · " : ""), axLink);
+  }
+  text.append(sym, sub, addr);
+  row.append(av, text);
+  td.append(row);
+  return td;
+}
+function thesisCell(a) {
+  const td = document.createElement("div");
+  const box = document.createElement("div");
+  box.className = "snips";
+  fillSnips(box, a.snippets || []);
+  td.append(box);
+  return td;
+}
+function capCell(a) {
+  const td = document.createElement("div");
+  td.className = "capbig";
+  td.dataset.cap = "1";
+  td.textContent = usd(a.market_cap);
+  if (a.market_cap) td.title = "капа в момент алерта";
+  return td;
+}
+function whenCell(a) {
+  const td = document.createElement("div");
+  td.className = "alertwhen";
+  const hm = document.createElement("div");
+  hm.dataset.clock = "1";
+  hm.textContent = clock(a.at);
+  const rel = document.createElement("div");
+  rel.className = "ago alertago";
+  rel.dataset.ago = a.at || "";
+  rel.textContent = ago(a.at);
+  td.append(hm, rel);
+  return td;
+}
+function moreCell(a) {
+  const td = document.createElement("div");
+  td.className = "actions";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "closecall";
+  close.textContent = "×";
+  close.setAttribute("aria-label", "Закрыть");
+  close.addEventListener("click", () => dismissCall(a.id));
+  const page = document.createElement("a");
+  page.className = "more";
+  page.href = a.page_url || "#";
+  page.target = "_blank";
+  page.rel = "noreferrer noopener";
+  page.textContent = "···";
+  page.setAttribute("aria-label", "Тексты тезисов");
+  td.append(close, page);
+  return td;
+}
+function openToken(id) {
+  if (!id) return;
+  view = "token";
+  tokenKind = "alert";
+  tokenId = id;
+  tokenDetail = null;
+  document.getElementById("q").value = "";
+  document.getElementById("backFeed").textContent = "← К ленте";
+  applyView();
+  renderTiers();
+  document.getElementById("tokenHead").replaceChildren();
+  document.getElementById("tokenStats").replaceChildren();
+  document.getElementById("tokenTheses").replaceChildren();
+  document.getElementById("tokenEmpty").hidden = true;
+  fetch("/api/alerts/" + encodeURIComponent(id), { cache: "no-store" }).then(res => {
+    if (!res.ok) throw new Error(String(res.status));
+    return res.json();
+  }).then(d => {
+    if (tokenId !== id) return;
+    tokenDetail = d;
+    renderToken();
+  }).catch(() => {
+    if (tokenId !== id) return;
+    document.getElementById("tokenEmpty").hidden = false;
+    document.getElementById("tokenEmpty").textContent = "Не удалось открыть токен.";
+  });
+}
+function openWatch(mint) {
+  if (!mint) return;
+  view = "token";
+  tokenKind = "watch";
+  tokenId = mint;
+  tokenDetail = null;
+  document.getElementById("q").value = "";
+  document.getElementById("backFeed").textContent = "← К наблюдению";
+  applyView();
+  renderTiers();
+  document.getElementById("tokenHead").replaceChildren();
+  document.getElementById("tokenStats").replaceChildren();
+  document.getElementById("tokenTheses").replaceChildren();
+  document.getElementById("tokenEmpty").hidden = true;
+  refreshWatch(mint);
+}
+function refreshWatch(mint) {
+  fetch("/api/watch/" + encodeURIComponent(mint), { cache: "no-store" }).then(res => {
+    if (res.status === 404) throw new Error("gone");
+    if (!res.ok) throw new Error(String(res.status));
+    return res.json();
+  }).then(d => {
+    if (tokenKind !== "watch" || tokenId !== mint) return;
+    tokenDetail = d;
+    renderToken();
+  }).catch(err => {
+    if (tokenKind !== "watch" || tokenId !== mint) return;
+    if (tokenDetail && err.message !== "gone") return;
+    const empty = document.getElementById("tokenEmpty");
+    empty.hidden = false;
+    empty.textContent = err.message === "gone" ? "Токен уже не в наблюдении." : "Не удалось открыть токен.";
+  });
+}
+function renderHits() {
+  const box = document.getElementById("hits");
+  const q = feedQuery();
+  if (view !== "token" || !q) { box.hidden = true; box.replaceChildren(); return; }
+  box.replaceChildren();
+  if (tokenKind === "watch") {
+    const rows = ((data && data.tokens) || []).filter(t => [t.symbol, t.name, t.mint].join(" ").toLowerCase().includes(q)).slice(0, 8);
+    if (!rows.length) { box.hidden = true; return; }
+    for (const t of rows) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "hit";
+      b.textContent = (t.symbol || shortMint(t.mint)) + (t.name ? " · " + t.name : "") + (t.mint ? " · " + shortMint(t.mint) : "");
+      b.addEventListener("click", () => openWatch(t.mint));
+      box.append(b);
+    }
+    box.hidden = false;
+    return;
+  }
+  const rows = feedItems().filter(a => [a.symbol, a.name, a.mint].join(" ").toLowerCase().includes(q)).slice(0, 8);
+  if (!rows.length) { box.hidden = true; return; }
+  for (const a of rows) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "hit";
+    b.textContent = (a.symbol || shortMint(a.mint)) + (a.name ? " · " + a.name : "") + (a.mint ? " · " + shortMint(a.mint) : "");
+    b.addEventListener("click", () => openToken(a.id));
+    box.append(b);
+  }
+  box.hidden = false;
+}
+function renderToken() {
+  const d = tokenDetail;
+  if (!d) return;
+  document.getElementById("sub").textContent = (d.symbol || "Токен") + (d.name ? " · " + d.name : "");
+  const head = document.getElementById("tokenHead");
+  const kept = head.querySelector("img");
+  head.replaceChildren();
+  const av = document.createElement("div");
+  av.className = "av";
+  av.style.setProperty("--h", hue(d.mint || d.symbol));
+  if (kept) av.append(kept);
+  placeImage(av, d.symbol, d.image_url);
+  const text = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "sym";
+  title.textContent = d.symbol || shortMint(d.mint);
+  if (d.tier) {
+    const tier = document.createElement("span");
+    tier.className = "tier t" + d.tier;
+    tier.style.marginLeft = "8px";
+    tier.textContent = "Тир " + d.tier;
+    title.append(tier);
+  }
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = [d.name, d.chain, d.dex].filter(Boolean).join(" · ");
+  const addr = document.createElement("div");
+  addr.className = "sub";
+  addr.textContent = d.mint || "";
+  addr.title = d.mint || "";
+  if (d.mint) {
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "copy";
+    copy.textContent = "копировать";
+    copy.addEventListener("click", () => navigator.clipboard && navigator.clipboard.writeText(d.mint).then(() => { copy.textContent = "скопировано"; }));
+    addr.append(copy);
+  }
+  const fomo = safeURL(d.fomo_url);
+  if (fomo) {
+    const a = document.createElement("a");
+    a.href = fomo; a.target = "_blank"; a.rel = "noreferrer noopener"; a.textContent = "fomo";
+    addr.append(document.createTextNode(" · "), a);
+  }
+  const ax = safeURL(d.axiom_url);
+  if (ax) {
+    const a = document.createElement("a");
+    a.href = ax; a.target = "_blank"; a.rel = "noreferrer noopener"; a.textContent = "axiom";
+    addr.append(document.createTextNode(" · "), a);
+  }
+  text.append(title, sub, addr);
+  const extra = tokenFacts(d);
+  if (extra) text.append(extra);
+  head.append(av, text);
+
+  const stats = document.getElementById("tokenStats");
+  stats.replaceChildren();
+  const theses = d.theses || [];
+  const times = theses.map(t => new Date(t.at).getTime()).filter(n => !Number.isNaN(n));
+  const first = d.created_at || (times.length ? new Date(Math.min(...times)).toISOString() : "");
+  const last = times.length ? new Date(Math.max(...times)).toISOString() : (d.live ? "" : d.at);
+  if (d.live) {
+    const asked = d.checked_at || "";
+    stats.append(
+      stat("Капа", usd(d.market_cap), entryLine(d.entry_market_cap, d.quote_at)),
+      stat("Объём", usd(d.volume_usd), entryLine(d.entry_volume_usd, "") || "за 24 ч"),
+      stat("Ликвидность", usd(d.liquidity_usd), [d.liquidity_sol ? "старт " + sol(d.liquidity_sol) : "", d.entry_liquidity_usd ? "на входе " + usd(d.entry_liquidity_usd) : ""].filter(Boolean).join(" · ") || "dexscreener"),
+      stat("Тезисов", (d.count || 0) + " / " + (d.need || 0), theses.length && d.count > theses.length ? "в списке " + theses.length : (d.checked ? "с последнего опроса" : "ещё не спрашивали")),
+      stat("Последний опрос", asked ? clock(asked) : "—", asked ? ago(asked) : ""),
+      stat("Создан", d.created_at ? clock(d.created_at) : "—", d.created_at ? ago(d.created_at) : ""),
+      stat("Последний тезис", last ? clock(last) : "—", last ? ago(last) : "пока нет")
+    );
+  } else {
+    stats.append(
+      stat("Капа", usd(d.market_cap), "на момент кола"),
+      stat("Тезисов", d.count ? String(d.count) : String(theses.length), theses.length && d.count && theses.length < d.count ? "в списке " + theses.length : "на fomo"),
+      stat("Первый раз", first ? clock(first) : "—", first ? ago(first) : ""),
+      stat("Последний тезис", last ? clock(last) : "—", last ? ago(last) : "")
+    );
+  }
+  const list = document.getElementById("tokenTheses");
+  const empty = document.getElementById("tokenEmpty");
+  const rows = theses.slice().sort(thesisOrder());
+  list.replaceChildren();
+  if (!rows.length) {
+    empty.hidden = false;
+    empty.textContent = d.live
+      ? (d.checked ? "На последнем опросе тезисов не было." : "Ещё не спрашивали у fomo.")
+      : "С этим колом тезисы не сохранились.";
+    return;
+  }
+  empty.hidden = true;
+  rows.forEach((t, i) => list.append(thesisRow(t, i)));
+}
+function entryLine(entry, at) {
+  const bits = [];
+  if (entry) bits.push("на входе " + usd(entry));
+  if (at) bits.push("обновлено " + ago(at));
+  return bits.join(" · ");
+}
+function sol(v) {
+  if (!v) return "";
+  const n = v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
+  return String(n).replace(/\.0$/, "") + " SOL";
+}
+function tokenFacts(d) {
+  const el = document.createElement("div");
+  el.className = "sub";
+  if (d.deployer) {
+    const who = document.createElement("span");
+    who.textContent = "деплоер " + shortMint(d.deployer);
+    who.title = d.deployer;
+    el.append(who);
+  }
+  const links = [["website", "сайт"], ["twitter", "twitter"], ["telegram", "telegram"], ["discord", "discord"]];
+  for (const [key, label] of links) {
+    const url = safeURL(d[key]);
+    if (!url) continue;
+    if (el.childNodes.length) el.append(document.createTextNode(" · "));
+    const a = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noreferrer noopener"; a.textContent = label;
+    el.append(a);
+  }
+  if (!el.childNodes.length) return null;
+  return el;
+}
+function stat(k, v, s) {
+  const el = document.createElement("div");
+  el.className = "stat";
+  const kk = document.createElement("div"); kk.className = "k"; kk.textContent = k;
+  const vv = document.createElement("div"); vv.className = "v"; vv.textContent = v;
+  const ss = document.createElement("div"); ss.className = "s"; ss.textContent = s || "";
+  el.append(kk, vv, ss);
+  return el;
+}
+function thesisOrder() {
+  const at = t => new Date(t.at).getTime() || 0;
+  const key = {
+    new: (a, b) => at(b) - at(a),
+    old: (a, b) => at(a) - at(b),
+    pos: (a, b) => (b.position_usd - a.position_usd) || (at(b) - at(a)),
+    pos_small: (a, b) => (a.position_usd - b.position_usd) || (at(b) - at(a))
+  }[document.getElementById("thesisSort").value];
+  return key || ((a, b) => at(b) - at(a));
+}
+function thesisRow(t, i) {
+  const row = document.createElement("div");
+  row.className = "trow";
+  const mark = document.createElement("span");
+  mark.className = "mark";
+  mark.style.background = dotColors[i % dotColors.length];
+  const body = document.createElement("div");
+  const text = document.createElement("div");
+  text.className = "ttext";
+  text.textContent = t.text || "без текста";
+  const meta = document.createElement("div");
+  meta.className = "sub";
+  const who = [t.handle, t.is_dev ? "DEV" : "", t.verified ? "verified" : ""].filter(Boolean).join(" · ");
+  meta.textContent = [who, ago(t.at)].filter(Boolean).join(" · ");
+  body.append(text, meta);
+  const pos = document.createElement("div");
+  pos.className = "capbig";
+  pos.textContent = usd(t.position_usd);
+  const ps = document.createElement("div");
+  ps.className = "sub";
+  ps.textContent = t.closed ? "позиция закрыта" : "позиция";
+  pos.append(ps);
+  const when = document.createElement("div");
+  when.className = "alertwhen";
+  const hm = document.createElement("div");
+  hm.textContent = clock(t.at);
+  const rel = document.createElement("div");
+  rel.className = "ago";
+  rel.dataset.ago = t.at || "";
+  rel.textContent = ago(t.at);
+  when.append(hm, rel);
+  row.append(mark, body, pos, when);
+  return row;
+}
+function setLive(ok, text) {
+  const el = document.getElementById("live");
+  el.classList.toggle("ok", ok);
+  el.classList.toggle("bad", !ok && text !== "подключаемся");
+  document.getElementById("liveText").textContent = text;
+}
+async function load() {
+  const n = ++seq;
+  try {
+    const [res, feedRes] = await Promise.all([
+      fetch("/api/board", { cache: "no-store" }),
+      fetch("/api/alerts", { cache: "no-store" })
+    ]);
+    if (n !== seq) return;
+    if (!res.ok) {
+      setLive(false, res.status === 401 || res.status === 403 || feedRes.status === 401 || feedRes.status === 403 ? "нет доступа" : "ошибка " + res.status);
+      return;
+    }
+    if (feedRes.ok) feed = await feedRes.json();
+    data = await res.json();
+    fetchedAt = Date.now();
+    const when = new Date(data.as_of).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setLive(true, "на связи · " + when);
+    fillTierSelect();
+    renderNote();
+    renderTiers();
+    renderRows();
+    renderFeed();
+    if (view === "token" && tokenKind === "watch" && tokenId) refreshWatch(tokenId);
+  } catch (e) {
+    if (n !== seq) return;
+    setLive(false, "нет связи");
+  }
+}
+function schedule() {
+  clearTimeout(poll);
+  poll = setTimeout(async () => { await load(); schedule(); }, 3000);
+}
+function start() {
+  load().then(schedule);
+  clearInterval(tickTimer);
+  tickTimer = setInterval(tick, 1000);
+}
+document.getElementById("tier").addEventListener("change", () => { view = "watch"; applyView(); renderTiers(); renderRows(); });
+document.getElementById("sort").addEventListener("change", renderRows);
+document.getElementById("q").addEventListener("input", () => { renderRows(); renderFeed(); renderHits(); });
+document.getElementById("backFeed").addEventListener("click", () => { if (tokenKind === "watch") pickTier(selectedTier()); else pickFeed(); });
+document.getElementById("thesisSort").addEventListener("change", renderToken);
+document.getElementById("range").addEventListener("change", () => { renderTiers(); renderFeed(); });
+document.getElementById("feedSort").addEventListener("change", renderFeed);
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    document.getElementById("q").focus();
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { clearTimeout(poll); clearInterval(tickTimer); }
+  else start();
+});
+start();
+</script>
+</body>
+</html>

@@ -124,7 +124,7 @@ func (s *Source) handle(p axiom.Pair, emit func(Launch)) bool {
 		s.Stats.Filtered.Add(1)
 		s.mu.Lock()
 		if _, ok := s.seen[p.Token]; !ok {
-			s.seen[p.Token] = Launch{Mint: p.Token, Dex: label, Pool: p.Pair, Symbol: p.Ticker, Name: p.Name}
+			s.seen[p.Token] = launchFrom(p, time.Time{})
 		}
 		s.mu.Unlock()
 		s.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "протокол исключён",
@@ -150,7 +150,7 @@ func (s *Source) handle(p axiom.Pair, emit func(Launch)) bool {
 			"token", p.Token, "ticker", p.Ticker, "protocol", label)
 		return false
 	}
-	l := Launch{Mint: p.Token, CreatedAt: at, Dex: label, Pool: p.Pair, Symbol: p.Ticker, Name: p.Name}
+	l := launchFrom(p, at)
 	s.seen[p.Token] = l
 	s.mu.Unlock()
 
@@ -166,6 +166,14 @@ func (s *Source) handle(p axiom.Pair, emit func(Launch)) bool {
 		"token", p.Token, "ticker", p.Ticker, "name", p.Name, "protocol", label, "age", age, "pair", p.Pair)
 	emit(l)
 	return true
+}
+
+func launchFrom(p axiom.Pair, at time.Time) Launch {
+	return Launch{
+		Mint: p.Token, CreatedAt: at, Dex: p.Label(), Pool: p.Pair, Symbol: p.Ticker, Name: p.Name,
+		Deployer: p.Deployer, Website: p.Website, Twitter: p.Twitter, Telegram: p.Telegram, Discord: p.Discord,
+		ImageURL: domain.PictureURL(p.ImageURL), LiquiditySOL: p.LiquiditySOL,
+	}
 }
 
 // Protocols lists pairs received per protocol since the start, most first,

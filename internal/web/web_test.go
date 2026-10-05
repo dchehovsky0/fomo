@@ -121,3 +121,80 @@ func TestSaveAndServe(t *testing.T) {
 		}
 	}
 }
+
+func TestBoardPage(t *testing.T) {
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	serve := func(cfg Config, remote, url string) *httptest.ResponseRecorder {
+		t.Helper()
+		cfg.Dir = t.TempDir()
+		s, err := New(cfg, time.UTC, quiet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		req.RemoteAddr = remote
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+	local := serve(Config{}, "127.0.0.1:50000", "/")
+	if local.Code != http.StatusOK || !strings.Contains(local.Body.String(), "Наблюдение") {
+		t.Fatalf("local status %d", local.Code)
+	}
+	if csp := local.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "connect-src 'self'") {
+		t.Fatalf("csp %s", csp)
+	}
+	if local.Header().Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("referrer %s", local.Header().Get("Referrer-Policy"))
+	}
+	if got := serve(Config{Exposed: true, AdminToken: "s3"}, "203.0.113.7:1", "/").Code; got != http.StatusUnauthorized {
+		t.Fatalf("open server status %d", got)
+	}
+
+	cfg := Config{Dir: t.TempDir(), Exposed: true, AdminToken: "s3", PublicURL: "https://bot.example.com"}
+	s, err := New(cfg, time.UTC, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/?token=s3", nil)
+	req.RemoteAddr = "203.0.113.7:1"
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
+		t.Fatalf("redirect %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	var cookie *http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == adminCookie {
+			cookie = c
+		}
+	}
+	if cookie == nil || cookie.Value != "s3" || !cookie.HttpOnly || !cookie.Secure {
+		t.Fatalf("cookie %+v", cookie)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "203.0.113.7:1"
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "/api/board") {
+		t.Fatalf("with cookie %d", rec.Code)
+	}
+}
+
+func TestAdminCookie(t *testing.T) {
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	s, err := New(Config{Dir: t.TempDir(), Exposed: true, AdminToken: "s3"}, time.UTC, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.HandleAdmin("GET /health/accounts", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) }))
+	req := httptest.NewRequest(http.MethodGet, "/health/accounts", nil)
+	req.RemoteAddr = "203.0.113.7:1"
+	req.AddCookie(&http.Cookie{Name: adminCookie, Value: "s3"})
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+}

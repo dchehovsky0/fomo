@@ -18,6 +18,12 @@ type Pair struct {
 	Protocol        string
 	DisplayProtocol string
 	Deployer        string
+	Website         string
+	Twitter         string
+	Telegram        string
+	ImageURL        string
+	Discord         string
+	LiquiditySOL    float64
 	// CreatedAt is zero when Axiom sent none or in an unknown format.
 	CreatedAt time.Time
 }
@@ -36,14 +42,20 @@ type wsMessage struct {
 }
 
 type wsPair struct {
-	PairAddress     string `json:"pair_address"`
-	TokenAddress    string `json:"token_address"`
-	TokenName       string `json:"token_name"`
-	TokenTicker     string `json:"token_ticker"`
-	Protocol        string `json:"protocol"`
-	DisplayProtocol string `json:"display_protocol"`
-	Deployer        string `json:"deployer_address"`
-	CreatedAt       string `json:"created_at"`
+	PairAddress     string  `json:"pair_address"`
+	TokenAddress    string  `json:"token_address"`
+	TokenName       string  `json:"token_name"`
+	TokenTicker     string  `json:"token_ticker"`
+	Protocol        string  `json:"protocol"`
+	DisplayProtocol string  `json:"display_protocol"`
+	Deployer        string  `json:"deployer_address"`
+	Website         string  `json:"website"`
+	Twitter         string  `json:"twitter"`
+	Telegram        string  `json:"telegram"`
+	TokenImage      string  `json:"token_image"`
+	Discord         string  `json:"discord"`
+	LiquiditySOL    float64 `json:"initial_liquidity_sol"`
+	CreatedAt       string  `json:"created_at"`
 }
 
 // Parse decodes a new_pairs message. ok is false for other rooms and for
@@ -61,6 +73,7 @@ func Parse(data []byte) (Pair, bool) {
 	return Pair{
 		Token: p.TokenAddress, Pair: p.PairAddress, Name: p.TokenName, Ticker: p.TokenTicker,
 		Protocol: p.Protocol, DisplayProtocol: p.DisplayProtocol, Deployer: p.Deployer,
-		CreatedAt: created,
+		Website: p.Website, Twitter: p.Twitter, Telegram: p.Telegram, Discord: p.Discord, ImageURL: p.TokenImage,
+		LiquiditySOL: p.LiquiditySOL, CreatedAt: created,
 	}, true
 }

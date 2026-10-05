@@ -154,6 +154,15 @@ web:
   public_url: "${FOMO_PUBLIC_URL}"   # empty = http://localhost:8080, this computer only
   pages_dir: ./data/pages
   keep: 168h                    # pages are deleted after a week
+  # GET / is the watch board: tokens in tiers 1–4 right now, from the bot's
+  # memory, plus the feed of alerts already sent. GET /api/board is the watch
+  # snapshot. GET /api/watch/{mint} is the last fomo answer for a token still
+  # being watched: thesis texts, authors and position sizes. GET /api/alerts
+  # is the feed (time, ticker, thesis count, market cap at the alert, link to
+  # the theses page). GET /api/alerts/{id} opens one call with its theses.
+  # POST /api/alerts/{id}/dismiss
+  # hides a call from the feed; the theses page stays. The page reloads both every
+  # few seconds. Same access as the health routes below.
   # GET /health/accounts: which fomo accounts work, how many tokens are in
   # the fomo checks right now ("watching"), plus how DexScreener answered
   # market cap and volume for each screened token (?probe=1 checks accounts now).
