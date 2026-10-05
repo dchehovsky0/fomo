@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -107,6 +108,39 @@ func (s *Server) Save(a notify.Alert) (string, error) {
 	url := s.cfg.PublicURL + "/t/" + id
 	s.log.Info("theses page saved", "token", a.Token, "url", url, "bytes", len(data))
 	return url, nil
+}
+
+// Discard removes a page that was saved before Telegram accepted the alert.
+// The feed then does not show a call that never went out. A second call is a
+// no-op, and anything that is not a page id is left untouched.
+func (s *Server) Discard(pageURL string) error {
+	id := pageID(pageURL)
+	if !idPattern.MatchString(id) {
+		return nil
+	}
+	path := filepath.Join(s.cfg.Dir, id+".json")
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	s.feedMu.Lock()
+	delete(s.feedCache, id)
+	s.feedMu.Unlock()
+	s.log.Info("theses page removed after a failed send", "id", id)
+	return nil
+}
+
+func pageID(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	path := strings.TrimRight(u.Path, "/")
+	const marker = "/t/"
+	i := strings.LastIndex(path, marker)
+	if i < 0 {
+		return ""
+	}
+	return path[i+len(marker):]
 }
 
 // HandleAdmin registers a route for the bot's operator; call it before Run.

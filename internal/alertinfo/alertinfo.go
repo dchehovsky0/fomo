@@ -40,13 +40,14 @@ type Config struct {
 }
 
 type Builder struct {
-	cfg      Config
-	checkers []Checker
-	next     atomic.Uint64
-	pairs    PairSource
-	lookup   LaunchLookup
-	log      *slog.Logger
-	now      func() time.Time
+	cfg       Config
+	checkers  []Checker
+	next      atomic.Uint64
+	pairs     PairSource
+	lookup    LaunchLookup
+	log       *slog.Logger
+	now       func() time.Time
+	pumpEvery time.Duration
 }
 
 func New(cfg Config, checkers []Checker, pairs PairSource, lookup LaunchLookup, log *slog.Logger) *Builder {
@@ -65,8 +66,16 @@ func New(cfg Config, checkers []Checker, pairs PairSource, lookup LaunchLookup, 
 	if cfg.Since.IsZero() {
 		cfg.Since = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
-	return &Builder{cfg: cfg, checkers: checkers, pairs: pairs, lookup: lookup, log: log, now: time.Now}
+	return &Builder{
+		cfg: cfg, checkers: checkers, pairs: pairs, lookup: lookup, log: log, now: time.Now,
+		pumpEvery: 3 * time.Second,
+	}
 }
+
+// How many times a Pump AMM alert asks DexScreener while the cap is still
+// missing. The calls are pumpEvery apart. A cap on an earlier answer stops
+// the loop, and the alert is sent with whatever the last answer held.
+const pumpAMMTries = 15
 
 // Complete fills the alert. hint is a thesis page already fetched for the
 // token, if any; it saves requests when it holds every thesis.
@@ -103,13 +112,31 @@ func (b *Builder) Complete(ctx context.Context, a notify.Alert, hint *fomo.Token
 func (b *Builder) addMarket(ctx context.Context, a *notify.Alert) {
 	pair := ""
 	if b.pairs != nil {
-		started := time.Now()
-		pairs, err := b.pairs.Pairs(ctx, a.Token)
-		took := time.Since(started).Round(time.Millisecond)
-		if err != nil {
-			b.log.Warn("dexscreener pairs", "token", a.Token, "took", took, "err", err)
-		} else {
-			b.log.Info("dexscreener pairs", "token", a.Token, "took", took, "pairs", len(pairs))
+		tries := 1
+		if domain.PumpAMM(a.Dex) {
+			tries = pumpAMMTries
+		}
+		var pairs []dexscreener.Pair
+		for n := 1; n <= tries; n++ {
+			if n > 1 && !wait(ctx, b.pumpEvery) {
+				break
+			}
+			started := time.Now()
+			got, err := b.pairs.Pairs(ctx, a.Token)
+			took := time.Since(started).Round(time.Millisecond)
+			if err != nil {
+				b.log.Warn("dexscreener pairs", "token", a.Token, "try", n, "took", took, "err", err)
+			} else {
+				pairs = got
+				b.log.Info("dexscreener pairs", "token", a.Token, "try", n, "took", took, "pairs", len(pairs))
+			}
+			if best, ok := dexscreener.Best(pairs); ok && best.MarketCap > 0 {
+				break
+			}
+			if n < tries {
+				b.log.Info("dexscreener pairs", "token", a.Token, "try", n,
+					"why", "pump amm ещё без капы, повтор через 3с")
+			}
 		}
 		if best, ok := dexscreener.Best(pairs); ok {
 			pair = best.PairAddress
@@ -136,6 +163,20 @@ func (b *Builder) addMarket(ctx context.Context, a *notify.Alert) {
 	}
 	if b.cfg.AxiomLinkTemplate != "" {
 		a.AxiomURL = strings.NewReplacer("{pair}", pair, "{mint}", a.Token).Replace(b.cfg.AxiomLinkTemplate)
+	}
+}
+
+func wait(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return true
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
 	}
 }
 

@@ -34,6 +34,42 @@ type Token struct {
 	EntryLiquidityUSD float64
 }
 
+// PumpAMM reports a pool on Pump AMM. DexScreener often has no cap for
+// these on the first request, so callers poll them on a short interval.
+func PumpAMM(dex string) bool {
+	switch strings.ToLower(strings.TrimSpace(dex)) {
+	case "pump amm", "pump.amm", "Pump AMM":
+		return true
+	default:
+		return false
+	}
+}
+
+// AxiomImage is the token picture Axiom keeps for a mint. The launch message
+// often leaves token_image empty, while this file is already there.
+func AxiomImage(mint string) string {
+	if !base58Mint(mint) {
+		return ""
+	}
+	return "https://axiomtrading.sfo3.cdn.digitaloceanspaces.com/" + mint + ".webp"
+}
+
+func base58Mint(s string) bool {
+	if len(s) < 32 || len(s) > 44 {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= '1' && r <= '9':
+		case r >= 'A' && r <= 'H', r >= 'J' && r <= 'N', r >= 'P' && r <= 'Z':
+		case r >= 'a' && r <= 'k', r >= 'm' && r <= 'z':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // PictureURL is an image address the board can load. ipfs:// becomes an
 // https gateway. Anything that is not http(s) or ipfs is dropped.
 func PictureURL(raw string) string {
@@ -100,6 +136,8 @@ type Alert struct {
 	Theses []Thesis `json:"theses,omitempty"`
 	// Tier is the watch tier (1–4) when a theses alert was sent.
 	Tier int `json:"tier,omitempty"`
+	// FomoMS is how long the fomo request behind this alert took.
+	FomoMS int64 `json:"fomo_ms,omitempty"`
 
 	CreatedAt  time.Time `json:"created_at,omitzero"`
 	Dex        string    `json:"dex,omitempty"`

@@ -48,6 +48,9 @@ type BoardToken struct {
 	Checks   int    `json:"checks"`
 	NextMS   int64  `json:"next_ms"`
 	FailKind string `json:"fail_kind,omitempty"`
+	// FomoMS is how long the last fomo request took. The board marks it
+	// when the answer was slower than five seconds.
+	FomoMS   int64  `json:"fomo_ms,omitempty"`
 	FomoURL  string `json:"fomo_url,omitempty"`
 	AxiomURL string `json:"axiom_url,omitempty"`
 	ImageURL string `json:"image_url,omitempty"`
@@ -126,6 +129,16 @@ func atOr(t, fallback time.Time) time.Time {
 	return t
 }
 
+// noteFomo stores how long the last fomo request took. The board reads it.
+func (w *Watcher) noteFomo(it *item, took time.Duration) {
+	if took < 0 {
+		took = 0
+	}
+	w.mu.Lock()
+	it.fomoMS = took.Milliseconds()
+	w.mu.Unlock()
+}
+
 // clearMiss forgets request failures after an answer that came back.
 func (w *Watcher) clearMiss(it *item) {
 	w.mu.Lock()
@@ -169,6 +182,7 @@ func (w *Watcher) Board() Board {
 			Mint: it.l.Mint, Symbol: it.l.Symbol, Name: it.l.Name, Dex: it.l.Dex, Pool: it.l.Pool,
 			Tier: tier, AgeMS: age.Milliseconds(), LeftMS: left.Milliseconds(), EveryMS: every.Milliseconds(),
 			Theses: it.count, Checked: it.checks > 0, Checks: it.checks, NextMS: next, FailKind: it.failKind,
+			FomoMS:    it.fomoMS,
 			ImageURL:  pickImage(it),
 			MarketCap: it.marketCap, VolumeUSD: it.volumeUSD, LiquidityUSD: it.liquidityUSD,
 			EntryMarketCap: it.l.EntryMarketCap, EntryVolumeUSD: it.l.EntryVolumeUSD, EntryLiquidityUSD: it.l.EntryLiquidityUSD,
@@ -242,6 +256,7 @@ type LiveToken struct {
 	Need              int          `json:"need"`
 	Checked           bool         `json:"checked"`
 	CheckedAt         time.Time    `json:"checked_at,omitzero"`
+	FomoMS            int64        `json:"fomo_ms,omitempty"`
 	CreatedAt         time.Time    `json:"created_at,omitzero"`
 	FomoURL           string       `json:"fomo_url,omitempty"`
 	AxiomURL          string       `json:"axiom_url,omitempty"`
@@ -299,7 +314,7 @@ func (w *Watcher) Live(mint, fomoTpl, axiomTpl string) (LiveToken, bool) {
 	return LiveToken{
 		Mint: it.l.Mint, Symbol: it.l.Symbol, Name: it.l.Name, Chain: "Solana", Dex: it.l.Dex,
 		Tier: w.tierNumber(age), ImageURL: image, Count: it.count, Need: w.cfg.MinTheses,
-		Checked: it.checks > 0, CheckedAt: it.seenAt, CreatedAt: it.l.CreatedAt,
+		Checked: it.checks > 0, CheckedAt: it.seenAt, FomoMS: it.fomoMS, CreatedAt: it.l.CreatedAt,
 		FomoURL: linkTemplate(fomoTpl, it.l.Mint, ""), AxiomURL: linkTemplate(axiomTpl, it.l.Mint, it.l.Pool),
 		Live: true, Theses: theses,
 		MarketCap: it.marketCap, VolumeUSD: it.volumeUSD, LiquidityUSD: it.liquidityUSD,
@@ -334,7 +349,10 @@ func pickImage(it *item) string {
 	if it.image != "" {
 		return it.image
 	}
-	return it.l.ImageURL
+	if it.l.ImageURL != "" {
+		return it.l.ImageURL
+	}
+	return domain.AxiomImage(it.l.Mint)
 }
 
 // linkTemplate fills {mint} and {pair}. A template that needs a pool and

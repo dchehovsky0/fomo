@@ -186,3 +186,53 @@ func TestMarketFromDexScreener(t *testing.T) {
 		t.Errorf("fallback link = %s", a.AxiomURL)
 	}
 }
+
+type seqPairs struct {
+	calls int
+	seq   [][]dexscreener.Pair
+}
+
+func (s *seqPairs) Pairs(context.Context, string) ([]dexscreener.Pair, error) {
+	i := s.calls
+	s.calls++
+	if i >= len(s.seq) {
+		return s.seq[len(s.seq)-1], nil
+	}
+	return s.seq[i], nil
+}
+
+func TestPumpAMMPollsUntilCap(t *testing.T) {
+	src := &seqPairs{seq: [][]dexscreener.Pair{
+		nil,
+		{{PairAddress: "CURVE", MarketCap: 0}},
+		{{PairAddress: "AMM", MarketCap: 50_000, LiquidityUSD: 1000}},
+	}}
+	b := builder(nil, src, nil)
+	b.pumpEvery = time.Millisecond
+	a := b.Complete(context.Background(), notify.Alert{Token: "MINT", Dex: "Pump AMM"}, nil)
+	if src.calls != 3 || a.MarketCap != 50_000 || a.AxiomURL != "https://axiom.trade/meme/AMM?chain=sol" {
+		t.Fatalf("calls=%d alert=%+v", src.calls, a)
+	}
+
+	ready := &seqPairs{seq: [][]dexscreener.Pair{
+		{{PairAddress: "AMM", MarketCap: 50_000}},
+		{{PairAddress: "LATER", MarketCap: 99_000}},
+	}}
+	b = builder(nil, ready, nil)
+	b.pumpEvery = time.Millisecond
+	a = b.Complete(context.Background(), notify.Alert{Token: "MINT", Dex: "Pump AMM"}, nil)
+	if ready.calls != 1 || a.MarketCap != 50_000 {
+		t.Fatalf("a cap on the first answer must not be asked again: calls=%d mc=%v", ready.calls, a.MarketCap)
+	}
+
+	other := &seqPairs{seq: [][]dexscreener.Pair{
+		nil,
+		{{PairAddress: "LATER", MarketCap: 9}},
+	}}
+	b = builder(nil, other, nil)
+	b.pumpEvery = time.Millisecond
+	a = b.Complete(context.Background(), notify.Alert{Token: "MINT", Dex: "Pump V1"}, nil)
+	if other.calls != 1 || a.MarketCap != 0 {
+		t.Fatalf("other dex calls=%d mc=%v", other.calls, a.MarketCap)
+	}
+}

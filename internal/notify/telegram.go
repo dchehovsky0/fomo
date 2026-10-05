@@ -19,6 +19,12 @@ type Pages interface {
 	Save(a Alert) (string, error)
 }
 
+// Discarder removes a page published for an alert that was not delivered.
+// Pages may implement it; a sender that only saves still works.
+type Discarder interface {
+	Discard(pageURL string) error
+}
+
 type Telegram struct {
 	APIBase string
 	token   string
@@ -56,6 +62,10 @@ func (t *Telegram) Send(ctx context.Context, a Alert) error {
 		err = t.send(ctx, text+"\n\n📖 Тексты тезисов: "+html.EscapeString(a.PageURL), nil)
 	}
 	if err != nil {
+		// The page is written before Telegram answers. A failed send used to
+		// leave that page in the feed, and the retry half a minute later wrote
+		// a second one with a fresh market cap.
+		discardPage(t.pages, a.PageURL, t.log)
 		t.log.Warn("telegram send failed", "token", a.Token, "kind", a.Kind,
 			"took", time.Since(started).Round(time.Millisecond), "err", err)
 		return err
@@ -87,6 +97,19 @@ func publishPage(pages Pages, a Alert, log *slog.Logger) string {
 		return ""
 	}
 	return u
+}
+
+func discardPage(pages Pages, pageURL string, log *slog.Logger) {
+	if pageURL == "" || pages == nil {
+		return
+	}
+	d, ok := pages.(Discarder)
+	if !ok {
+		return
+	}
+	if err := d.Discard(pageURL); err != nil {
+		log.Warn("remove theses page after a failed send", "url", pageURL, "err", err)
+	}
 }
 
 type inlineButton struct {
@@ -203,6 +226,7 @@ func (c *Console) Send(_ context.Context, a Alert) error {
 	}
 	_, err := fmt.Fprintf(c.w, "\n===== DRY-RUN ALERT =====\n%s\n=========================\n\n", text)
 	if err != nil {
+		discardPage(c.pages, a.PageURL, c.log)
 		c.log.Warn("alert print failed", "token", a.Token, "kind", a.Kind,
 			"took", time.Since(started).Round(time.Millisecond), "err", err)
 		return err

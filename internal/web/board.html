@@ -110,6 +110,7 @@ a.sym:hover { color: var(--cyan); }
 .sub { color: var(--muted); font-size: 12px; }
 .sub a { color: var(--muted); }
 .fail { color: var(--amber); }
+.slow { color: var(--amber); font-weight: 650; }
 .tier {
   display: inline-block; min-width: 52px; text-align: center; border-radius: 999px; padding: 3px 8px;
   font-size: 12px; font-weight: 700; background: var(--card2); border: 1px solid var(--line);
@@ -310,6 +311,26 @@ button.sym { background: none; border: 0; padding: 0; cursor: pointer; text-alig
 </div>
 <script>
 const fails = { auth: "аккаунт не пустил", retry: "fomo недоступен", error: "ошибка запроса", send: "алерт не ушёл" };
+const slowFomoMS = 5000;
+function slowFomoText(ms) {
+  if (!ms || ms < slowFomoMS) return "";
+  return "fomo отвечал " + dur(ms);
+}
+function paintSlow(parent, ms) {
+  let el = parent.querySelector(":scope > .slow");
+  const msg = slowFomoText(ms);
+  if (!msg) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "sub slow";
+    el.title = "ответ fomo дольше 5 секунд";
+    parent.append(el);
+  }
+  el.textContent = msg;
+}
 const ranges = { "1h": 3600000, "6h": 21600000, "24h": 86400000, "7d": 604800000, all: 0 };
 let view = "watch";
 let data = null;
@@ -545,6 +566,7 @@ function paint(tr, t) {
     }
     fail.textContent = msg;
   } else if (fail) fail.remove();
+  paintSlow(who, t.fomo_ms);
 }
 function row(t) {
   const tr = document.createElement("tr");
@@ -591,6 +613,7 @@ function row(t) {
     f.textContent = fails[t.fail_kind] || t.fail_kind;
     text.append(f);
   }
+  paintSlow(text, t.fomo_ms);
   td.append(av, text);
   const capCell = cell(usd(t.market_cap));
   capCell.dataset.cap = "1";
@@ -916,6 +939,7 @@ function tokenCell(a) {
     addr.append(document.createTextNode(addr.childNodes.length ? " · " : ""), axLink);
   }
   text.append(sym, sub, addr);
+  paintSlow(text, a.fomo_ms);
   row.append(av, text);
   td.append(row);
   return td;
@@ -1110,6 +1134,7 @@ function renderToken() {
     addr.append(document.createTextNode(" · "), a);
   }
   text.append(title, sub, addr);
+  paintSlow(text, d.fomo_ms);
   const extra = tokenFacts(d);
   if (extra) text.append(extra);
   head.append(av, text);

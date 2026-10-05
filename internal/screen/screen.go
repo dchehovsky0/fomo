@@ -69,6 +69,14 @@ const dexRecent = 200
 // as long as the bot runs.
 const maxDexAttempts = 8
 
+// A Pump AMM pool is often missing from DexScreener for a few seconds.
+// Those empty answers are asked again on a short interval, and only for
+// the first pumpAMMTries. Later misses use the ordinary Retry.
+const (
+	pumpAMMEvery = 3 * time.Second
+	pumpAMMTries = 10
+)
+
 // DexAttempt is one DexScreener answer for a token. N starts at 1: the check
 // After after the token was created. The next numbers are retries.
 type DexAttempt struct {
@@ -494,12 +502,16 @@ func volumeGrew(prev, next, min float64) bool {
 
 func (g *Gate) again(it *item, why string) {
 	it.tries++
-	it.due = g.now().Add(g.cfg.Retry)
+	wait := g.cfg.Retry
+	if domain.PumpAMM(it.token.Dex) && it.tries <= pumpAMMTries {
+		wait = pumpAMMEvery
+	}
+	it.due = g.now().Add(wait)
 	g.mu.Lock()
 	if _, ok := g.pending[it.token.Mint]; !ok {
 		g.pending[it.token.Mint] = it
 	}
 	g.mu.Unlock()
 	g.log.Info("flow", "step", "капа", "decision", "повтор", "why", why,
-		"token", it.token.Mint, "ticker", it.token.Symbol, "try", it.tries)
+		"token", it.token.Mint, "ticker", it.token.Symbol, "try", it.tries, "next", wait.Round(time.Second))
 }

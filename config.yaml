@@ -96,6 +96,10 @@ axiom:
 # Ten seconds after launch, ask DexScreener for market cap. Above
 # min_market_cap the token enters tier 1. Volume is not an entry filter.
 # An empty DexScreener answer is asked again; it does not drop the token.
+# Pump AMM is the exception: while the cap is missing it is asked every 3s,
+# up to 10 times, and the same short loop runs again when its alert is built.
+# After those 10, an empty answer waits the ordinary 30s. Other protocols
+# wait 30s from the first miss. A cap on any answer stops the loop.
 # Each proxy takes 30 addresses, so proxies.txt with 10 lines checks 300
 # tokens per wave. Lines are socks5://user:pass@host:port.
 # recheck: while the token is in tiers 1–3, volume.h24 is compared with the

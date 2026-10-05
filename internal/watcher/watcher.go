@@ -121,6 +121,8 @@ type item struct {
 	volumeUSD    float64
 	liquidityUSD float64
 	quoteAt      time.Time
+	// fomoMS is how long the last fomo request for this token took.
+	fomoMS int64
 }
 
 // span is a stretch of time lost to one failed request or failed send,
@@ -448,6 +450,7 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	started := time.Now()
 	page, err := w.accounts[acc].Client.SortedThesis(ctx, it.l.Mint, it.l.CreatedAt.Add(-time.Minute), now.Add(time.Minute), w.cfg.ThesisLimit)
 	took := time.Since(started)
+	w.noteFomo(it, took)
 	finished := w.now()
 	w.Stats.CheckNanos.Add(int64(took))
 	w.Stats.CheckSamples.Add(1)
@@ -719,7 +722,7 @@ func (w *Watcher) signal(ctx context.Context, it *item, page *fomo.TokenThesisPa
 	alert := notify.Alert{
 		Kind: notify.KindTheses, Threshold: w.cfg.MinTheses, Token: it.l.Mint, Symbol: ticker, Name: it.l.Name,
 		CreatedAt: it.l.CreatedAt, Dex: it.l.Dex, DetectedAt: now, CountKnown: true, Count: n,
-		Tier: w.tierNumber(w.inWork(it, now)),
+		Tier: w.tierNumber(w.inWork(it, now)), FomoMS: nonNegMS(fomoTook),
 	}
 	asmStart := time.Now()
 	if w.cfg.Complete != nil {

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"fomobot/internal/domain"
 	"fomobot/internal/notify"
 )
 
@@ -36,6 +37,7 @@ type FeedItem struct {
 	Chain     string       `json:"chain,omitempty"`
 	Tier      int          `json:"tier,omitempty"`
 	ImageURL  string       `json:"image_url,omitempty"`
+	FomoMS    int64        `json:"fomo_ms,omitempty"`
 	Snippets  []FeedThesis `json:"snippets,omitempty"`
 }
 
@@ -128,9 +130,16 @@ func (s *Server) readAlert(id string) (FeedItem, bool) {
 	return FeedItem{
 		ID: id, At: at, Kind: a.Kind, Mint: a.Token, Symbol: a.Symbol, Name: a.Name, Dex: a.Dex,
 		Theses: a.Count, MarketCap: a.MarketCap, PageURL: "/t/" + id,
-		FomoURL: a.FomoURL, AxiomURL: a.AxiomURL, Chain: a.Chain, Tier: a.Tier, ImageURL: a.ImageURL,
-		Snippets: feedSnippets(a),
+		FomoURL: a.FomoURL, AxiomURL: a.AxiomURL, Chain: a.Chain, Tier: a.Tier, ImageURL: alertImage(a),
+		FomoMS: a.FomoMS, Snippets: feedSnippets(a),
 	}, true
+}
+
+func alertImage(a notify.Alert) string {
+	if a.ImageURL != "" {
+		return a.ImageURL
+	}
+	return domain.AxiomImage(a.Token)
 }
 
 // feedSnippets is the three newest thesis texts saved with the alert.
@@ -171,6 +180,7 @@ type TokenDetail struct {
 	FomoURL   string         `json:"fomo_url,omitempty"`
 	AxiomURL  string         `json:"axiom_url,omitempty"`
 	PageURL   string         `json:"page_url"`
+	FomoMS    int64          `json:"fomo_ms,omitempty"`
 	Theses    []DetailThesis `json:"theses"`
 }
 
@@ -206,8 +216,8 @@ func (s *Server) readToken(id string) (TokenDetail, bool) {
 	}
 	return TokenDetail{
 		ID: id, At: at, Mint: a.Token, Symbol: a.Symbol, Name: a.Name, Chain: a.Chain, Dex: a.Dex,
-		Tier: a.Tier, ImageURL: a.ImageURL, MarketCap: a.MarketCap, Count: a.Count, CreatedAt: a.CreatedAt,
-		FomoURL: a.FomoURL, AxiomURL: a.AxiomURL, PageURL: "/t/" + id, Theses: detailTheses(a),
+		Tier: a.Tier, ImageURL: alertImage(a), MarketCap: a.MarketCap, Count: a.Count, CreatedAt: a.CreatedAt,
+		FomoURL: a.FomoURL, AxiomURL: a.AxiomURL, PageURL: "/t/" + id, FomoMS: a.FomoMS, Theses: detailTheses(a),
 	}, true
 }
 

@@ -112,6 +112,45 @@ func TestMissingCapIsRetried(t *testing.T) {
 	}
 }
 
+func TestPumpAMMEmptyCapIsAskedEveryThreeSeconds(t *testing.T) {
+	q := &fakeQ{limit: 10, quotes: map[string]dexscreener.Quote{}}
+	g := New(Config{After: time.Second, MinMarketCap: 7000, Retry: 30 * time.Second}, q, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	g.Add(domain.Token{Mint: "amm", Dex: "Pump AMM", CreatedAt: now.Add(-time.Minute)})
+	g.Add(domain.Token{Mint: "v1", Dex: "Pump V1", CreatedAt: now.Add(-time.Minute)})
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("empty cap must stay pending") })
+
+	g.mu.Lock()
+	amm, v1 := g.pending["amm"].due, g.pending["v1"].due
+	g.mu.Unlock()
+	if !amm.Equal(now.Add(3 * time.Second)) {
+		t.Fatalf("pump amm next ask in %s, want 3s", amm.Sub(now))
+	}
+	if !v1.Equal(now.Add(30 * time.Second)) {
+		t.Fatalf("other dex next ask in %s, want 30s", v1.Sub(now))
+	}
+
+	for range pumpAMMTries - 1 {
+		now = amm
+		g.wave(context.Background(), func(domain.Token) { t.Fatal("still no cap") })
+		g.mu.Lock()
+		amm = g.pending["amm"].due
+		g.mu.Unlock()
+	}
+	if !amm.Equal(now.Add(3 * time.Second)) {
+		t.Fatalf("attempt %d still fast, next in %s", pumpAMMTries, amm.Sub(now))
+	}
+	now = amm
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("still no cap") })
+	g.mu.Lock()
+	amm = g.pending["amm"].due
+	g.mu.Unlock()
+	if !amm.Equal(now.Add(30 * time.Second)) {
+		t.Fatalf("after %d misses the ordinary interval should apply, next in %s", pumpAMMTries, amm.Sub(now))
+	}
+}
+
 func TestDexHealthSaysWhichRequestReturnedCap(t *testing.T) {
 	q := &fakeQ{limit: 10, quotes: map[string]dexscreener.Quote{}}
 	g := New(Config{After: 10 * time.Second, MinMarketCap: 7000, Retry: time.Second}, q, slog.New(slog.NewTextHandler(io.Discard, nil)))

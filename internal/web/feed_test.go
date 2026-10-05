@@ -40,7 +40,7 @@ func TestFeedListsSavedAlerts(t *testing.T) {
 	newPage := save(notify.Alert{
 		Kind: notify.KindTheses, Token: "MINTNEW", Symbol: "NEW", Name: "New coin", Chain: "Solana", Tier: 1,
 		DetectedAt: now.Add(-time.Hour), SentAt: now.Add(-time.Hour),
-		Count: 3, MarketCap: 80_000, AxiomURL: "https://axiom.trade/meme/POOL?chain=sol",
+		Count: 3, MarketCap: 80_000, FomoMS: 60188, AxiomURL: "https://axiom.trade/meme/POOL?chain=sol",
 		Latest: []notify.Thesis{
 			{At: now.Add(-40 * time.Minute), Handle: "a", Text: "старый\nтекст"},
 			{At: now.Add(-20 * time.Minute), Handle: "b", Text: "средний"},
@@ -59,7 +59,7 @@ func TestFeedListsSavedAlerts(t *testing.T) {
 	if len(feed.Alerts) != 2 {
 		t.Fatalf("alerts = %d", len(feed.Alerts))
 	}
-	if feed.Alerts[0].Symbol != "NEW" || feed.Alerts[0].PageURL != newPage || feed.Alerts[0].Theses != 3 || feed.Alerts[0].MarketCap != 80_000 || feed.Alerts[0].Tier != 1 {
+	if feed.Alerts[0].Symbol != "NEW" || feed.Alerts[0].PageURL != newPage || feed.Alerts[0].Theses != 3 || feed.Alerts[0].MarketCap != 80_000 || feed.Alerts[0].Tier != 1 || feed.Alerts[0].FomoMS != 60188 {
 		t.Fatalf("newest: %+v", feed.Alerts[0])
 	}
 	if n := feed.Alerts[0].Snippets; len(n) != 3 || n[0].Text != "свежий" || n[2].Text != "старый текст" {
@@ -219,5 +219,52 @@ func TestTokenDetailListsTheses(t *testing.T) {
 	got := get("/api/alerts/" + oldID)
 	if len(got.Theses) != 2 || got.Theses[0].Text != "первый" || got.Theses[1].PositionUSD != 20 {
 		t.Fatalf("merged: %+v", got.Theses)
+	}
+}
+
+func TestDiscardRemovesFailedSend(t *testing.T) {
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	dir := t.TempDir()
+	s, err := New(Config{Dir: dir, PublicURL: "http://localhost:8080"}, time.UTC, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
+	pageURL, err := s.Save(notify.Alert{
+		Kind: notify.KindTheses, Token: "MINT", Symbol: "ELON", Name: "Elon", Dex: "Pump AMM",
+		DetectedAt: now, SentAt: now, Count: 7, MarketCap: 46_000,
+		First: []notify.Thesis{{At: now, Handle: "a", Text: "текст"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Feed(now).Alerts) != 1 {
+		t.Fatal("saved page must be in the feed before the send result is known")
+	}
+	if err := s.Discard(pageURL); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Feed(now).Alerts) != 0 {
+		t.Fatal("a failed send must not stay in the feed")
+	}
+	id := strings.TrimPrefix(pageURL, "http://localhost:8080/t/")
+	if _, err := os.Stat(filepath.Join(dir, id+".json")); !os.IsNotExist(err) {
+		t.Fatalf("page file: %v", err)
+	}
+	if err := s.Discard(pageURL); err != nil {
+		t.Fatal(err)
+	}
+	kept := filepath.Join(dir, "dismissed.json")
+	if err := os.WriteFile(kept, []byte("[]"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Discard("http://localhost:8080/t/dismissed"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Discard("http://localhost:8080/t/../../config.yaml"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Fatal(err)
 	}
 }

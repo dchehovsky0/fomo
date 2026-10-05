@@ -14,6 +14,22 @@ import (
 	"fomobot/internal/store"
 )
 
+func TestPickImageUsesAxiomWhenNoneWasStored(t *testing.T) {
+	mint := "9VA7bH2LLodtZ2wJR7BPZznADgq32J9HCg286aaGmoon"
+	it := &item{l: domain.Token{Mint: mint}}
+	if got := pickImage(it); got != domain.AxiomImage(mint) {
+		t.Fatalf("fallback %s", got)
+	}
+	it.l.ImageURL = "https://cdn.example/from-dex.png"
+	if got := pickImage(it); got != "https://cdn.example/from-dex.png" {
+		t.Fatalf("stored image lost: %s", got)
+	}
+	it.image = "https://cdn.example/from-fomo.png"
+	if got := pickImage(it); got != "https://cdn.example/from-fomo.png" {
+		t.Fatalf("fomo image lost: %s", got)
+	}
+}
+
 func prodSchedule() []Tier {
 	return []Tier{
 		{MaxAge: 20 * time.Minute, Every: 2 * time.Second},
@@ -58,6 +74,7 @@ func TestBoardGroupsByTheSchedule(t *testing.T) {
 	older := put("older", 60*time.Minute, 20*time.Second)
 	put("late", 3*time.Hour, time.Minute)
 	w.publishCount(fresh, 2)
+	w.noteFomo(fresh, 60*time.Second+188*time.Millisecond)
 	w.miss(older, "error", now.Add(-time.Second), now)
 
 	b := w.Board()
@@ -77,7 +94,7 @@ func TestBoardGroupsByTheSchedule(t *testing.T) {
 	if f.Tier != 1 || f.AgeMS != (4*time.Minute).Milliseconds() || f.LeftMS != (16*time.Minute).Milliseconds() || f.EveryMS != 2000 {
 		t.Fatalf("fresh: %+v", f)
 	}
-	if !f.Checked || f.Theses != 2 || f.Checks != 1 || f.NextMS != 1500 {
+	if !f.Checked || f.Theses != 2 || f.Checks != 1 || f.NextMS != 1500 || f.FomoMS != 60188 {
 		t.Fatalf("fresh count: %+v", f)
 	}
 	if b.Tokens[1].Tier != 2 || b.Tokens[1].Checked || b.Tokens[1].NextMS != -5000 {
