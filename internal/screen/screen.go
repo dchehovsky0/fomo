@@ -1,36 +1,48 @@
-// Package screen holds a new token until it is old enough, then asks
-// DexScreener for market cap. Below the cap the token never reaches the fomo
-// checks. An empty answer is asked again. While the token is in tiers 1–3,
-// volume.h24 is compared with the previous sample every Recheck. Two samples
-// in a row that grew by less than MinGrowth drop the token. Tier 4 is not checked.
+// Package screen holds a new token until it is old enough, then asks Axiom
+// for the pair's trading volume over the last 5 minutes. At or below
+// MinVolume5m the token never reaches the fomo checks. A pair with no volume
+// yet is asked again until NoVolumeFor after creation; the first empty answer
+// at or past it drops the token. While the token is in tiers 1–3, the
+// 5-minute volume is asked again on its own clock. The first sample waits one
+// Recheck after the token enters the book. Three samples in a row under
+// MinVolume5m drop it. Tier 4 is not checked.
+//
+// Asks go out one token at a time. Among asks already due, the one that has
+// been waiting longest goes first, whether it is the first ask, a retry or a
+// tier recheck. The stats window spaces the actual HTTP calls.
 package screen
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"maps"
+	"strings"
 	"sync"
 	"time"
 
-	"fomobot/internal/dexscreener"
 	"fomobot/internal/domain"
 )
 
-// Querier fetches quotes for a wave of mints. failed are the mints whose
-// request did not complete.
+// Querier fetches pair volumes for a wave of tokens. A token with no trades
+// yet answers with zero volume. failed are the tokens whose request did not
+// complete.
 type Querier interface {
 	Limit() int
-	Wave(ctx context.Context, mints []string) (quotes map[string]dexscreener.Quote, failed []string, err error)
+	Wave(ctx context.Context, tokens []domain.Token) (vols map[string]domain.Volume, failed []string, err error)
 }
 
 type Config struct {
-	After        time.Duration
-	MinMarketCap float64
-	Retry        time.Duration
-	Recheck      time.Duration
-	// MinGrowth is the minimum fractional rise in volume.h24 between samples.
-	// 0.05 means 5%. Growth under it is a bad sample.
-	MinGrowth float64
+	After time.Duration
+	// MinVolume5m is the USD volume over the last 5 minutes a token must
+	// exceed to enter tier 1, and must keep reaching while in tiers 1–3.
+	MinVolume5m float64
+	Retry       time.Duration
+	Recheck     time.Duration
+	// NoVolumeFor is how long after creation a pair may answer with no
+	// volume. An empty answer at or past it drops the token. A request Axiom
+	// did not answer is not an empty answer.
+	NoVolumeFor time.Duration
 }
 
 type Gate struct {
@@ -41,84 +53,86 @@ type Gate struct {
 
 	mu      sync.Mutex
 	pending map[string]*item
-	dex     map[string]*dexState
+	dex     map[string]*volState
 	dexOrd  []string
-	dexSum  DexHealth
+	dexSum  Health
 	vol     map[string]*volTrack
+	// closedUntil holds the lane when the stats window is not open yet.
+	// Reads in that stretch are not attempts and are not paced.
+	closedUntil time.Time
 }
 
-// volTrack is the last successful 24h volume and how many bad samples
-// followed it in a row.
+// volTrack is the recheck streak for one watched token, and when the next
+// sample is due. bad counts samples under MinVolume5m. flat counts samples
+// whose 5-minute volume is exactly the same as the previous one.
 type volTrack struct {
+	bad  int
+	flat int
 	last float64
 	seen bool
-	bad  int
+	next time.Time
 }
 
 type item struct {
 	token domain.Token
 	due   time.Time
 	tries int
+	// born is the creation time, or when the token was added if the launch
+	// had none or it was in the future. NoVolumeFor counts from here.
+	born time.Time
 }
 
 // How many screened tokens the health report keeps, newest last in storage.
-const dexRecent = 200
+const volRecent = 200
 
-// maxDexAttempts is how many DexScreener answers one token keeps. An empty
-// answer is asked again until a cap arrives, so an uncapped list grows for
-// as long as the bot runs.
-const maxDexAttempts = 8
+// maxAttempts is how many Axiom answers one token keeps. A request Axiom did
+// not answer is asked again with no limit, so the list is capped here.
+const maxAttempts = 8
 
-// A Pump AMM pool is often missing from DexScreener for a few seconds.
-// Those empty answers are asked again on a short interval, and only for
-// the first pumpAMMTries. Later misses use the ordinary Retry.
+// lowSamples is how many samples in a row under MinVolume5m drop a token.
+// flatSamples is how many rechecks in a row with the exact same 5-minute
+// volume do the same. The entry sample is not one of them.
 const (
-	pumpAMMEvery = 3 * time.Second
-	pumpAMMTries = 10
+	lowSamples  = 3
+	flatSamples = 3
 )
 
-// DexAttempt is one DexScreener answer for a token. N starts at 1: the check
-// After after the token was created. The next numbers are retries.
-type DexAttempt struct {
+// Attempt is one Axiom answer for a token. N starts at 1: the check After
+// after the token was created. The next numbers are retries.
+type Attempt struct {
 	N           int       `json:"n"`
 	At          time.Time `json:"at"`
 	TokenAgeSec int       `json:"token_age_sec"`
 	Answered    bool      `json:"answered"`
-	Listed      bool      `json:"listed"`
-	MarketCap   float64   `json:"market_cap"`
-	CapKnown    bool      `json:"cap_known"`
-	VolumeUSD   float64   `json:"volume_usd"`
-	VolumeKnown bool      `json:"volume_known"`
+	Volume5m    float64   `json:"volume_5m"`
+	Trades5m    int       `json:"trades_5m"`
 }
 
-// DexToken is every DexScreener answer for one mint and the screen's decision.
-type DexToken struct {
-	Mint     string       `json:"mint"`
-	Symbol   string       `json:"symbol,omitempty"`
-	Decision string       `json:"decision,omitempty"`
-	Why      string       `json:"why,omitempty"`
-	Attempts []DexAttempt `json:"attempts"`
+// VolToken is every Axiom answer for one mint and the screen's decision.
+type VolToken struct {
+	Mint     string    `json:"mint"`
+	Symbol   string    `json:"symbol,omitempty"`
+	Decision string    `json:"decision,omitempty"`
+	Why      string    `json:"why,omitempty"`
+	Attempts []Attempt `json:"attempts"`
 }
 
-// DexHealth says how often market cap and volume showed up, and on which request.
-type DexHealth struct {
+// Health says how often volume showed up, and on which request.
+type Health struct {
 	Tokens            int         `json:"tokens"`
 	Requests          int         `json:"requests"`
-	CapFromRequest    map[int]int `json:"cap_from_request"`
 	VolumeFromRequest map[int]int `json:"volume_from_request"`
-	NeverCap          int         `json:"never_cap"`
 	NeverVolume       int         `json:"never_volume"`
 	Passed            int         `json:"passed"`
 	Dropped           int         `json:"dropped"`
 	Waiting           int         `json:"waiting"`
-	Recent            []DexToken  `json:"recent"`
+	Recent            []VolToken  `json:"recent"`
 }
 
-type dexState struct {
-	tok    DexToken
-	sawCap bool
-	sawVol bool
-	done   bool
+type volState struct {
+	tok       VolToken
+	sawVolume bool
+	done      bool
 }
 
 func New(cfg Config, q Querier, log *slog.Logger) *Gate {
@@ -128,48 +142,192 @@ func New(cfg Config, q Querier, log *slog.Logger) *Gate {
 	if cfg.Retry <= 0 {
 		cfg.Retry = 30 * time.Second
 	}
-	if cfg.MinGrowth <= 0 {
-		cfg.MinGrowth = 0.05
+	if cfg.NoVolumeFor <= 0 {
+		cfg.NoVolumeFor = 2 * time.Minute
 	}
 	if log == nil {
 		log = slog.Default()
 	}
 	return &Gate{
 		cfg: cfg, q: q, log: log, now: time.Now, pending: map[string]*item{},
-		dex: map[string]*dexState{}, vol: map[string]*volTrack{},
-		dexSum: DexHealth{
-			CapFromRequest:    map[int]int{},
-			VolumeFromRequest: map[int]int{},
-		},
+		dex: map[string]*volState{}, vol: map[string]*volTrack{},
+		dexSum: Health{VolumeFromRequest: map[int]int{}},
 	}
 }
 
-// Add remembers a launch until it is old enough for the cap check.
+// Add remembers a launch until it is old enough for the volume check.
 func (g *Gate) Add(token domain.Token) {
 	now := g.now()
 	due := token.CreatedAt.Add(g.cfg.After)
 	if token.CreatedAt.IsZero() || due.Before(now) {
 		due = now
 	}
+	born := token.CreatedAt
+	if born.IsZero() || born.After(now) {
+		born = now
+	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if _, ok := g.pending[token.Mint]; ok {
 		return
 	}
-	g.pending[token.Mint] = &item{token: token, due: due}
+	g.pending[token.Mint] = &item{token: token, due: due, born: born}
 }
 
-// Run checks due tokens in one wave and emits those whose cap clears the threshold.
-func (g *Gate) Run(ctx context.Context, emit func(domain.Token)) {
-	t := time.NewTicker(2 * time.Second)
-	defer t.Stop()
-	for {
-		g.wave(ctx, emit)
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
+// Run asks for one due token at a time and emits those whose volume clears
+// the threshold. book, when set, is rechecked on the same lane. A nil book
+// only screens new tokens.
+func (g *Gate) Run(ctx context.Context, emit func(domain.Token), book Book) {
+	for ctx.Err() == nil {
+		if g.now().Before(g.closedUntil) {
+			if !g.idle(ctx, book) {
+				return
+			}
+			continue
 		}
+		it, tok, ok := g.next(g.now(), book)
+		switch {
+		case it != nil:
+			g.ask(ctx, []*item{it}, emit)
+		case ok:
+			g.recheckOne(ctx, book, tok)
+		default:
+			if !g.idle(ctx, book) {
+				return
+			}
+		}
+	}
+}
+
+// next takes the ask that has been due the longest: a first check, a retry,
+// or a tier 1–3 recheck. A recheck does not wait for the entry queue to
+// empty; when both are due at the same moment the entry queue goes first.
+func (g *Gate) next(now time.Time, book Book) (*item, domain.Token, bool) {
+	var tok domain.Token
+	var at time.Time
+	var due bool
+	if book != nil {
+		tok, at, due = g.dueRecheck(now, book)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	best := g.oldestDue(now)
+	if best != nil && (!due || !at.Before(best.due)) {
+		delete(g.pending, best.token.Mint)
+		return best, domain.Token{}, false
+	}
+	if !due {
+		return nil, domain.Token{}, false
+	}
+	g.vol[tok.Mint].next = now.Add(g.cfg.Recheck)
+	return nil, tok, true
+}
+
+// takeNext removes the due token that has been waiting the longest.
+// A newer token does not jump ahead of a retry whose turn already came.
+func (g *Gate) takeNext(now time.Time) *item {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	best := g.oldestDue(now)
+	if best == nil {
+		return nil
+	}
+	delete(g.pending, best.token.Mint)
+	return best
+}
+
+// oldestDue is the pending ask whose time came first. g.mu must be held.
+func (g *Gate) oldestDue(now time.Time) *item {
+	var best *item
+	for _, it := range g.pending {
+		if it.due.After(now) {
+			continue
+		}
+		if best == nil || it.due.Before(best.due) {
+			best = it
+		}
+	}
+	return best
+}
+
+// takeRecheck picks one tier 1–3 token whose own recheck time has arrived
+// and reserves the next sample.
+func (g *Gate) takeRecheck(now time.Time, book Book) (domain.Token, bool) {
+	tok, _, ok := g.dueRecheck(now, book)
+	if !ok {
+		return domain.Token{}, false
+	}
+	g.mu.Lock()
+	g.vol[tok.Mint].next = now.Add(g.cfg.Recheck)
+	g.mu.Unlock()
+	return tok, true
+}
+
+// dueRecheck finds the tier 1–3 token whose recheck has been due the longest
+// and when it fell due. It does not reserve the sample. A token just admitted
+// to the book waits one full Recheck before its first sample, so the
+// admission read is not repeated.
+func (g *Gate) dueRecheck(now time.Time, book Book) (domain.Token, time.Time, bool) {
+	if g.cfg.Recheck <= 0 {
+		return domain.Token{}, time.Time{}, false
+	}
+	tokens := book.VolumeTokens()
+	g.forgetVolume(tokens)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	var best domain.Token
+	var bestAt time.Time
+	found := false
+	for _, tok := range tokens {
+		tr := g.vol[tok.Mint]
+		if tr == nil {
+			g.vol[tok.Mint] = &volTrack{next: now.Add(g.cfg.Recheck)}
+			continue
+		}
+		if tr.next.IsZero() {
+			tr.next = now.Add(g.cfg.Recheck)
+			continue
+		}
+		if tr.next.After(now) {
+			continue
+		}
+		if !found || tr.next.Before(bestAt) {
+			best, bestAt, found = tok, tr.next, true
+		}
+	}
+	return best, bestAt, found
+}
+
+// idle sleeps until the next due ask, or a short poll so a token added
+// meanwhile is noticed. false means ctx is done.
+func (g *Gate) idle(ctx context.Context, book Book) bool {
+	const poll = 200 * time.Millisecond
+	wait := poll
+	now := g.now()
+	g.mu.Lock()
+	for _, it := range g.pending {
+		if d := it.due.Sub(now); d > 0 && d < wait {
+			wait = d
+		}
+	}
+	if book != nil && g.cfg.Recheck > 0 {
+		for _, tr := range g.vol {
+			if tr.next.IsZero() {
+				continue
+			}
+			if d := tr.next.Sub(now); d > 0 && d < wait {
+				wait = d
+			}
+		}
+	}
+	g.mu.Unlock()
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 
@@ -188,15 +346,23 @@ func (g *Gate) wave(ctx context.Context, emit func(domain.Token)) {
 		}
 	}
 	g.mu.Unlock()
+	g.ask(ctx, batch, emit)
+}
+
+func (g *Gate) ask(ctx context.Context, batch []*item, emit func(domain.Token)) {
 	if len(batch) == 0 {
 		return
 	}
-	mints := make([]string, len(batch))
+	now := g.now()
+	tokens := make([]domain.Token, len(batch))
 	for i, it := range batch {
-		mints[i] = it.token.Mint
+		tokens[i] = it.token
 	}
-	quotes, failed, waveErr := g.q.Wave(ctx, mints)
-	if ctx.Err() != nil {
+	vols, failed, waveErr := g.q.Wave(ctx, tokens)
+	if ctx.Err() != nil || pageClosed(waveErr) {
+		if pageClosed(waveErr) {
+			g.blockFor(time.Second)
+		}
 		g.mu.Lock()
 		for _, it := range batch {
 			if _, ok := g.pending[it.token.Mint]; !ok {
@@ -204,10 +370,13 @@ func (g *Gate) wave(ctx context.Context, emit func(domain.Token)) {
 			}
 		}
 		g.mu.Unlock()
+		if pageClosed(waveErr) {
+			g.log.Warn("axiom volume wave", "failed", len(failed), "err", waveErr)
+		}
 		return
 	}
 	if waveErr != nil {
-		g.log.Warn("dexscreener wave", "failed", len(failed), "err", waveErr)
+		g.log.Warn("axiom volume wave", "failed", len(failed), "err", waveErr)
 	}
 	failedSet := map[string]bool{}
 	for _, mint := range failed {
@@ -215,71 +384,81 @@ func (g *Gate) wave(ctx context.Context, emit func(domain.Token)) {
 	}
 	for _, it := range batch {
 		mint := it.token.Mint
-		att := DexAttempt{N: it.tries + 1, At: now, Answered: true}
+		att := Attempt{N: it.tries + 1, At: now, Answered: true}
 		if !it.token.CreatedAt.IsZero() {
 			att.TokenAgeSec = int(now.Sub(it.token.CreatedAt).Round(time.Second) / time.Second)
 		}
-		var liq float64
-		var picture string
+		var v domain.Volume
 		decision, why := "", ""
 		switch {
 		case failedSet[mint]:
 			att.Answered = false
+			if it.token.Pool == "" && g.noVolumeExpired(it, now) {
+				decision, why = "пропуск", "нет адреса пары"+g.noVolumeTail()
+			}
 		default:
-			q, ok := quotes[mint]
-			att.Listed = ok
-			att.MarketCap = q.MarketCap
-			att.CapKnown = ok && q.MarketCap > 0
-			att.VolumeUSD = q.VolumeUSD
-			att.VolumeKnown = ok && q.VolumeKnown
-			liq = q.LiquidityUSD
-			picture = q.ImageURL
+			v = vols[mint]
+			att.Volume5m, att.Trades5m = v.USD5m, v.Trades5m
 			switch {
-			case !ok || q.MarketCap <= 0:
-				// An empty answer is not a rejection. Asked again below.
-			case g.cfg.MinMarketCap > 0 && q.MarketCap <= g.cfg.MinMarketCap:
-				decision, why = "пропуск", "капа не выше порога"
+			case v.USD5m <= 0:
+				if g.noVolumeExpired(it, now) {
+					decision, why = "пропуск", "объёма нет"+g.noVolumeTail()
+				}
+			case v.USD5m <= g.cfg.MinVolume5m:
+				decision, why = "пропуск", "объём не выше порога"
 			default:
-				decision, why = "в работу", "капа выше порога"
+				decision, why = "в работу", "объём выше порога"
 			}
 		}
 		g.record(it, att, decision, why)
 		if decision == "" {
-			why := "ещё нет на dexscreener"
-			if failedSet[mint] {
-				why = "dexscreener не ответил"
+			why := "ещё нет объёма"
+			if it.token.Pool == "" {
+				why = "нет адреса пары"
+			} else if failedSet[mint] {
+				why = "axiom не ответил"
 			}
 			g.again(it, why)
 			continue
 		}
+		g.log.Info("flow", "step", "объём", "decision", decision, "why", why,
+			"token", mint, "ticker", it.token.Symbol,
+			"volume_5m", v.USD5m, "trades_5m", v.Trades5m, "volume_1h", v.USD1h, "request", att.N)
 		if decision == "пропуск" {
-			g.log.Info("flow", "step", "капа", "decision", decision, "why", why,
-				"token", mint, "ticker", it.token.Symbol,
-				"mc", att.MarketCap, "volume", att.VolumeUSD, "request", att.N)
 			continue
 		}
-		g.log.Info("flow", "step", "капа", "decision", decision, "why", why,
-			"token", mint, "ticker", it.token.Symbol,
-			"mc", att.MarketCap, "volume", att.VolumeUSD, "request", att.N)
 		tok := it.token
-		tok.EntryMarketCap = att.MarketCap
-		if att.VolumeKnown {
-			tok.EntryVolumeUSD = att.VolumeUSD
-		}
-		tok.EntryLiquidityUSD = liq
-		if tok.ImageURL == "" {
-			tok.ImageURL = domain.PictureURL(picture)
-		}
+		tok.EntryVolume = v
 		emit(tok)
 	}
 }
 
-func (g *Gate) record(it *item, att DexAttempt, decision, why string) {
+// noVolumeExpired is true once NoVolumeFor has passed since the token was born.
+func (g *Gate) noVolumeExpired(it *item, now time.Time) bool {
+	born := it.born
+	if born.IsZero() {
+		born = it.token.CreatedAt
+	}
+	if born.IsZero() {
+		return false
+	}
+	return now.Sub(born) >= g.cfg.NoVolumeFor
+}
+
+func (g *Gate) noVolumeTail() string {
+	d := g.cfg.NoVolumeFor
+	if d%time.Minute == 0 {
+		return fmt.Sprintf(" через %d мин после создания", int(d/time.Minute))
+	}
+	return " через " + d.Round(time.Second).String() + " после создания"
+}
+
+func (g *Gate) record(it *item, att Attempt, decision, why string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	st := g.dex[it.token.Mint]
 	if st == nil {
-		st = &dexState{tok: DexToken{Mint: it.token.Mint, Symbol: it.token.Symbol}}
+		st = &volState{tok: VolToken{Mint: it.token.Mint, Symbol: it.token.Symbol}}
 		g.dex[it.token.Mint] = st
 		g.dexOrd = append(g.dexOrd, it.token.Mint)
 		g.dexSum.Tokens++
@@ -287,19 +466,15 @@ func (g *Gate) record(it *item, att DexAttempt, decision, why string) {
 	if st.tok.Symbol == "" {
 		st.tok.Symbol = it.token.Symbol
 	}
-	if len(st.tok.Attempts) >= maxDexAttempts {
-		kept := make([]DexAttempt, maxDexAttempts-1, maxDexAttempts)
-		copy(kept, st.tok.Attempts[len(st.tok.Attempts)-(maxDexAttempts-1):])
+	if len(st.tok.Attempts) >= maxAttempts {
+		kept := make([]Attempt, maxAttempts-1, maxAttempts)
+		copy(kept, st.tok.Attempts[len(st.tok.Attempts)-(maxAttempts-1):])
 		st.tok.Attempts = kept
 	}
 	st.tok.Attempts = append(st.tok.Attempts, att)
 	g.dexSum.Requests++
-	if att.CapKnown && !st.sawCap {
-		st.sawCap = true
-		g.dexSum.CapFromRequest[att.N]++
-	}
-	if att.VolumeKnown && !st.sawVol {
-		st.sawVol = true
+	if att.Volume5m > 0 && !st.sawVolume {
+		st.sawVolume = true
 		g.dexSum.VolumeFromRequest[att.N]++
 	}
 	if decision != "" && !st.done {
@@ -311,33 +486,29 @@ func (g *Gate) record(it *item, att DexAttempt, decision, why string) {
 		} else {
 			g.dexSum.Dropped++
 		}
-		if !st.sawCap {
-			g.dexSum.NeverCap++
-		}
-		if !st.sawVol {
+		if !st.sawVolume {
 			g.dexSum.NeverVolume++
 		}
 	}
-	for len(g.dexOrd) > dexRecent {
+	for len(g.dexOrd) > volRecent {
 		old := g.dexOrd[0]
 		delete(g.dex, old)
 		g.dexOrd = g.dexOrd[1:]
 	}
-	if cap(g.dexOrd) > dexRecent*2 {
+	if cap(g.dexOrd) > volRecent*2 {
 		fresh := make([]string, len(g.dexOrd))
 		copy(fresh, g.dexOrd)
 		g.dexOrd = fresh
 	}
 }
 
-// Health is the DexScreener section of /health/accounts.
-func (g *Gate) Health() DexHealth {
+// Health is the Axiom volume section of /health/accounts.
+func (g *Gate) Health() Health {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	h := g.dexSum
-	h.CapFromRequest = maps.Clone(g.dexSum.CapFromRequest)
 	h.VolumeFromRequest = maps.Clone(g.dexSum.VolumeFromRequest)
-	h.Recent = make([]DexToken, 0, len(g.dexOrd))
+	h.Recent = make([]VolToken, 0, len(g.dexOrd))
 	for i := len(g.dexOrd) - 1; i >= 0; i-- {
 		st := g.dex[g.dexOrd[i]]
 		if st == nil {
@@ -347,7 +518,7 @@ func (g *Gate) Health() DexHealth {
 			h.Waiting++
 		}
 		cp := st.tok
-		cp.Attempts = append([]DexAttempt(nil), st.tok.Attempts...)
+		cp.Attempts = append([]Attempt(nil), st.tok.Attempts...)
 		h.Recent = append(h.Recent, cp)
 	}
 	return h
@@ -361,32 +532,15 @@ type Book interface {
 	Release(mint string) bool
 }
 
-// quoteSink receives the latest DexScreener numbers for a watched token.
+// volumeSink receives the latest Axiom volume for a watched token.
 // The watch board implements it. A book that does not is left as it is.
-type quoteSink interface {
-	NoteQuote(mint string, marketCap, volume, liquidity float64, volumeKnown bool, image string, at time.Time)
+type volumeSink interface {
+	NoteVolume(mint string, v domain.Volume, at time.Time)
 }
 
-// Recheck compares volume.h24 with the previous sample for tokens in tiers 1–3.
-// Growth under MinGrowth is a bad sample. Two bad samples in a row remove the
-// token. A missing answer is not a sample and does not change the streak.
-func (g *Gate) Recheck(ctx context.Context, book Book) {
-	every := g.cfg.Recheck
-	if every <= 0 {
-		return
-	}
-	t := time.NewTicker(every)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			g.recheck(ctx, book)
-		}
-	}
-}
-
+// recheck scores every token still in tiers 1–3. Run does not use it:
+// live traffic goes through recheckOne so the book is not dumped at once.
+// A missing answer is not a sample and does not change either streak.
 func (g *Gate) recheck(ctx context.Context, book Book) {
 	tokens := book.VolumeTokens()
 	g.forgetVolume(tokens)
@@ -401,44 +555,83 @@ func (g *Gate) recheck(ctx context.Context, book Book) {
 		n := min(len(tokens), limit)
 		batch := tokens[:n]
 		tokens = tokens[n:]
-		mints := make([]string, len(batch))
-		byMint := make(map[string]domain.Token, len(batch))
-		for i, tok := range batch {
-			mints[i] = tok.Mint
-			byMint[tok.Mint] = tok
-		}
-		quotes, failed, err := g.q.Wave(ctx, mints)
+		vols, failed, err := g.q.Wave(ctx, batch)
 		if ctx.Err() != nil {
 			return
 		}
-		if err != nil {
-			g.log.Warn("dexscreener recheck", "failed", len(failed), "err", err)
+		g.score(book, batch, vols, failed, err)
+	}
+}
+
+func (g *Gate) recheckOne(ctx context.Context, book Book, tok domain.Token) {
+	if book != nil && !mintWatched(book.VolumeTokens(), tok.Mint) {
+		g.mu.Lock()
+		delete(g.vol, tok.Mint)
+		g.mu.Unlock()
+		return
+	}
+	vols, failed, err := g.q.Wave(ctx, []domain.Token{tok})
+	if ctx.Err() != nil {
+		return
+	}
+	if pageClosed(err) {
+		g.blockFor(time.Second)
+		g.mu.Lock()
+		if tr := g.vol[tok.Mint]; tr != nil {
+			tr.next = g.now()
 		}
-		skip := map[string]bool{}
-		for _, mint := range failed {
-			skip[mint] = true
+		g.mu.Unlock()
+		g.log.Warn("axiom volume recheck", "failed", len(failed), "err", err)
+		return
+	}
+	g.score(book, []domain.Token{tok}, vols, failed, err)
+}
+
+func mintWatched(tokens []domain.Token, mint string) bool {
+	for _, tok := range tokens {
+		if tok.Mint == mint {
+			return true
 		}
-		for _, mint := range mints {
-			if skip[mint] {
-				continue
-			}
-			q, ok := quotes[mint]
-			if !ok {
-				continue
-			}
-			if sink, ok := book.(quoteSink); ok {
-				sink.NoteQuote(mint, q.MarketCap, q.VolumeUSD, q.LiquidityUSD, q.VolumeKnown, q.ImageURL, g.now())
-			}
-			if !q.VolumeKnown {
-				continue
-			}
-			g.judgeVolume(book, byMint[mint], q.VolumeUSD)
+	}
+	return false
+}
+
+func pageClosed(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "not open")
+}
+
+func (g *Gate) blockFor(d time.Duration) {
+	until := g.now().Add(d)
+	if until.After(g.closedUntil) {
+		g.closedUntil = until
+	}
+}
+
+func (g *Gate) score(book Book, batch []domain.Token, vols map[string]domain.Volume, failed []string, err error) {
+	if err != nil {
+		g.log.Warn("axiom volume recheck", "failed", len(failed), "err", err)
+	}
+	skip := map[string]bool{}
+	for _, mint := range failed {
+		skip[mint] = true
+	}
+	for _, tok := range batch {
+		if skip[tok.Mint] {
+			continue
 		}
+		v, ok := vols[tok.Mint]
+		if !ok {
+			continue
+		}
+		if sink, ok := book.(volumeSink); ok {
+			sink.NoteVolume(tok.Mint, v, g.now())
+		}
+		g.judgeVolume(book, tok, v)
 	}
 }
 
 // forgetVolume drops samples for tokens that left tiers 1–3. Release already
-// removes a token dropped for flat volume; expiry and an alert do not.
+// removes a token dropped for low volume; expiry and an alert do not.
 func (g *Gate) forgetVolume(live []domain.Token) {
 	keep := make(map[string]struct{}, len(live))
 	for _, tok := range live {
@@ -453,65 +646,64 @@ func (g *Gate) forgetVolume(live []domain.Token) {
 	g.mu.Unlock()
 }
 
-// judgeVolume records one successful 24h volume. The first sample is only a
-// baseline. Later growth under MinGrowth counts as bad; two in a row drop
-// the token. A rise at or above MinGrowth clears the streak.
-func (g *Gate) judgeVolume(book Book, tok domain.Token, volume float64) {
+// judgeVolume records one answered recheck. A 5-minute volume under
+// MinVolume5m, zero included, is a low sample; three in a row drop the
+// token. Exactly the floor, or more, clears that streak. The same dollar
+// three rechecks in a row drops it too: the window is frozen. Any other
+// figure starts that count over. A sample under the floor still counts
+// toward the frozen streak, but three low samples win and use their own
+// reason.
+func (g *Gate) judgeVolume(book Book, tok domain.Token, v domain.Volume) {
 	g.mu.Lock()
 	tr := g.vol[tok.Mint]
 	if tr == nil {
 		tr = &volTrack{}
 		g.vol[tok.Mint] = tr
 	}
-	if !tr.seen {
-		tr.seen = true
-		tr.last = volume
-		g.mu.Unlock()
-		return
-	}
-	prev := tr.last
-	if volumeGrew(prev, volume, g.cfg.MinGrowth) {
+	if v.USD5m >= g.cfg.MinVolume5m {
 		tr.bad = 0
 	} else {
 		tr.bad++
 	}
-	tr.last = volume
-	bad := tr.bad
+	if tr.seen && v.USD5m == tr.last {
+		tr.flat++
+	} else {
+		tr.flat = 1
+		tr.last = v.USD5m
+		tr.seen = true
+	}
+	bad, flat := tr.bad, tr.flat
 	g.mu.Unlock()
-	if bad < 2 {
+	if bad >= lowSamples {
+		g.dropWatched(book, tok, v, "объём за 5 минут ниже порога три замера подряд")
 		return
 	}
-	if book.Release(tok.Mint) {
-		g.mu.Lock()
-		delete(g.vol, tok.Mint)
-		g.mu.Unlock()
-		g.log.Info("flow", "step", "объём", "decision", "снят",
-			"why", "объём не растёт два замера подряд", "token", tok.Mint, "ticker", tok.Symbol,
-			"volume", volume, "prev", prev, "min_growth", g.cfg.MinGrowth)
+	if flat >= flatSamples {
+		g.dropWatched(book, tok, v, "объём за 5 минут не меняется три замера подряд")
 	}
 }
 
-// volumeGrew reports whether next is at least min fraction above prev.
-// A zero baseline grows when any volume appears.
-func volumeGrew(prev, next, min float64) bool {
-	if prev <= 0 {
-		return next > 0
+func (g *Gate) dropWatched(book Book, tok domain.Token, v domain.Volume, why string) {
+	if !book.Release(tok.Mint) {
+		return
 	}
-	return (next-prev)/prev >= min
+	g.mu.Lock()
+	delete(g.vol, tok.Mint)
+	g.mu.Unlock()
+	g.log.Info("flow", "step", "объём", "decision", "снят",
+		"why", why, "token", tok.Mint, "ticker", tok.Symbol,
+		"volume_5m", v.USD5m, "trades_5m", v.Trades5m, "volume_1h", v.USD1h,
+		"min_volume_5m", g.cfg.MinVolume5m)
 }
 
 func (g *Gate) again(it *item, why string) {
 	it.tries++
-	wait := g.cfg.Retry
-	if domain.PumpAMM(it.token.Dex) && it.tries <= pumpAMMTries {
-		wait = pumpAMMEvery
-	}
-	it.due = g.now().Add(wait)
+	it.due = g.now().Add(g.cfg.Retry)
 	g.mu.Lock()
 	if _, ok := g.pending[it.token.Mint]; !ok {
 		g.pending[it.token.Mint] = it
 	}
 	g.mu.Unlock()
-	g.log.Info("flow", "step", "капа", "decision", "повтор", "why", why,
-		"token", it.token.Mint, "ticker", it.token.Symbol, "try", it.tries, "next", wait.Round(time.Second))
+	g.log.Info("flow", "step", "объём", "decision", "повтор", "why", why,
+		"token", it.token.Mint, "ticker", it.token.Symbol, "try", it.tries, "next", g.cfg.Retry.Round(time.Second))
 }

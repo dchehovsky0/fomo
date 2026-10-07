@@ -179,15 +179,15 @@ func TestLiveTokenShowsLastPoll(t *testing.T) {
 	}
 	w.mu.Lock()
 	it.l.Deployer = "DEP111111111111111111111111111111111111111"
-	it.l.EntryMarketCap = 9000
-	it.l.EntryVolumeUSD = 500
+	it.l.EntryVolume = domain.Volume{USD5m: 1500, USD1h: 1500, Trades5m: 20, Trades1h: 20}
 	it.l.LiquiditySOL = 12
 	it.l.Twitter = "https://x.com/mew"
 	w.mu.Unlock()
-	w.NoteQuote("fresh", 12000, 4000, 1500, true, "", now)
+	w.NoteVolume("fresh", domain.Volume{USD5m: 0, USD1h: 4200, Trades5m: 0, Trades1h: 57}, now)
 	d, ok = w.Live("fresh", "", "")
-	if !ok || d.MarketCap != 12000 || d.VolumeUSD != 4000 || d.LiquidityUSD != 1500 || d.EntryMarketCap != 9000 || d.EntryVolumeUSD != 500 || d.LiquiditySOL != 12 || d.Deployer == "" || d.Twitter == "" {
-		t.Fatalf("quote: %+v", d)
+	if !ok || d.USD5m != 0 || d.USD1h != 4200 || d.Trades1h != 57 || d.EntryVolume5m != 1500 || !d.VolumeAt.Equal(now) ||
+		d.LiquiditySOL != 12 || d.Deployer == "" || d.Twitter == "" {
+		t.Fatalf("volume: %+v", d)
 	}
 
 	rec := httptest.NewRecorder()
@@ -203,6 +203,70 @@ func TestLiveTokenShowsLastPoll(t *testing.T) {
 	w.LiveHandler("", "").ServeHTTP(miss, missReq)
 	if miss.Code != http.StatusNotFound {
 		t.Fatalf("missing status %d", miss.Code)
+	}
+}
+
+func TestReleaseHandlerStopsTheWatch(t *testing.T) {
+	st, err := store.Open("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := testConfig()
+	cfg.Schedule = prodSchedule()
+	cfg.Lifetime = 49*time.Hour + 50*time.Minute
+	w := New(cfg, nil, nil, st, quiet())
+	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
+	w.now = func() time.Time { return now }
+	for _, mint := range []string{"fresh", "mid"} {
+		w.Add(domain.Token{Mint: mint, Symbol: mint, CreatedAt: now})
+	}
+	h := w.ReleaseHandler()
+
+	bad := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/0/release", nil)
+	req.SetPathValue("mint", "0")
+	h.ServeHTTP(bad, req)
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("bad mint %d", bad.Code)
+	}
+	if w.Watching() != 2 {
+		t.Fatalf("bad mint released tokens: %d", w.Watching())
+	}
+
+	one := httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/watch/fresh/release", nil)
+	req.SetPathValue("mint", "fresh")
+	h.ServeHTTP(one, req)
+	if one.Code != http.StatusNoContent {
+		t.Fatalf("release %d %s", one.Code, one.Body.String())
+	}
+	if w.Watching() != 1 || len(w.VolumeTokens()) != 1 || w.VolumeTokens()[0].Mint != "mid" {
+		t.Fatalf("after one: watching %d volume %+v", w.Watching(), w.VolumeTokens())
+	}
+
+	again := httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/watch/fresh/release", nil)
+	req.SetPathValue("mint", "fresh")
+	h.ServeHTTP(again, req)
+	if again.Code != http.StatusNotFound {
+		t.Fatalf("second %d", again.Code)
+	}
+
+	many := httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/watch/release", strings.NewReader(`{"mints":["mid","fresh","nope"]}`))
+	h.ServeHTTP(many, req)
+	if many.Code != http.StatusOK || !strings.Contains(many.Body.String(), `"released":1`) {
+		t.Fatalf("many %d %s", many.Code, many.Body.String())
+	}
+	if w.Watching() != 0 || len(w.VolumeTokens()) != 0 {
+		t.Fatalf("still watching %d", w.Watching())
+	}
+
+	empty := httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/watch/release", strings.NewReader(`{"mints":[]}`))
+	h.ServeHTTP(empty, req)
+	if empty.Code != http.StatusBadRequest {
+		t.Fatalf("empty %d", empty.Code)
 	}
 }
 

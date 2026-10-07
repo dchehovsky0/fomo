@@ -74,7 +74,9 @@ axiom:
     - wss://cluster3.axiom.trade/
     - wss://cluster5.axiom.trade/
     - wss://cluster7.axiom.trade/
-  chrome_profile_dir: ./axiom-profile   # not one of the fomo account profiles
+  chrome_profile_dir: ./axiom-profile   # new pairs only; not one of the fomo account profiles
+  stats_profile_dir: ./axiom-stats-profile # pair-stats-v4 only, a second axiom account.
+                                           # Log in with the bot stopped: fomobot -axiom-stats-login
   headless: false               # true on a server without a screen, if Cloudflare lets it in
   access_token: "${AXIOM_ACCESS_TOKEN}"
   refresh_token: "${AXIOM_REFRESH_TOKEN}"
@@ -83,7 +85,7 @@ axiom:
   # ["Pump V1"]. Empty = every protocol. The "axiom stats" log line shows
   # how many pairs came per protocol.
   protocols: []
-  # These never reach DexScreener, the fomo checks or any alert.
+  # These never reach the volume check, the fomo checks or any alert.
   skip_protocols:
     - Meteora AMM V2
     - Meteora DLMM
@@ -93,30 +95,41 @@ axiom:
   stall_timeout: 3m             # no new pair for this long: restart Chrome
   start_timeout: 90s            # opening axiom.trade (Cloudflare included)
 
-# Ten seconds after launch, ask DexScreener for market cap. Above
-# min_market_cap the token enters tier 1. Volume is not an entry filter.
-# An empty DexScreener answer is asked again; it does not drop the token.
-# Pump AMM is the exception: while the cap is missing it is asked every 3s,
-# up to 10 times, and the same short loop runs again when its alert is built.
-# After those 10, an empty answer waits the ordinary 30s. Other protocols
-# wait 30s from the first miss. A cap on any answer stops the loop.
-# Each proxy takes 30 addresses, so proxies.txt with 10 lines checks 300
-# tokens per wave. Lines are socks5://user:pass@host:port.
-# recheck: while the token is in tiers 1–3, volume.h24 is compared with the
-# previous sample. Growth under volume_min_growth is a bad sample. Two bad
-# samples in a row drop the token. An empty answer is not a sample.
+# Ten seconds after launch, ask Axiom for the pair's volume
+# (GET api7.axiom.trade/pair-stats-v4?pairAddress=...&v=2). The body has
+# windows for 5m, 1h, 6h and 24h: [buys, sells, buy USD, sell USD, price %].
+# Volume is buy USD plus sell USD. The filter uses the 5-minute window; the
+# board and alerts show 1h and 5m side by side.
+# Above min_volume_5m the token enters tier 1. At or below it (but not zero)
+# the token is dropped. No trades yet (windows null or zero) is asked again
+# every 30s; the first such answer at or past no_volume_for after creation
+# drops the token. Axiom not answering is asked again with no limit.
+# The stats window (axiom.stats_profile_dir) asks for one pair at a time, as
+# soon as that pair is due. Calls start 500ms apart and never closer than
+# 250ms. A 429, a 404, or a failed fetch doubles the gap up to 8s.
+# Tier 1–3 rechecks use the same lane. Whatever has been due the longest goes
+# next: a first ask, a retry, or a recheck. A tie goes to the entry queue.
+# The first recheck waits one recheck interval, so admission is not asked twice.
+# The pair socket stays in the other axiom window.
+# proxies.txt below is only for fomo accounts that have no proxy of their own.
+# recheck: while the token is in tiers 1–3, a 5-minute volume under
+# min_volume_5m (zero included) is a low sample. Three low samples in a row
+# drop the token; a sample at or above the floor resets the count.
+# The same 5-minute volume on three rechecks in a row drops it too.
+# Any other figure resets that count. The entry sample is not one of them.
+# Axiom not answering is not a sample.
 # Rules: TOKEN_TIERS.md.
 screen:
   after: 10s
-  min_market_cap: 7000
+  min_volume_5m: 5000           # USD, buys + sells over Axiom's 5m window
   recheck: 30s
-  volume_min_growth: 0.05
+  no_volume_for: 2m
   proxies: ./proxies.txt
 
 watch:
   # From the moment the token enters tier 1: 20m + 30m + 1h + 48h.
   lifetime: 49h50m
-  # DexScreener volume is checked only until tier 4, which starts at 1h50m.
+  # Pair volume is checked only until tier 4, which starts at 1h50m.
   volume_for: 110m
   min_theses: 3                 # alert when the token has this many theses
   thesis_limit: 500             # one sortedThesis page; 500 is the API cap so the window comes back whole
@@ -143,7 +156,7 @@ telegram:
   bot_token: "${TELEGRAM_BOT_TOKEN}"
   chat_id: "${TELEGRAM_CHAT_ID}"
   token_link_template: "https://fomo.family/tokens/solana/{mint}"
-  # {pair} = the token's main pool (DexScreener, most liquidity), {mint} = the token.
+  # {pair} = the token's pool from the Axiom launch, {mint} = the token.
   axiom_link_template: "https://axiom.trade/meme/{pair}?chain=sol&chains=sol,robinhood,bnb,base&pulseChains=sol,robinhood,bnb,base&trackerChains=sol,robinhood,bnb,base&discoverChains=sol,robinhood,bnb,base"
   timezone: Europe/Moscow       # thesis times in alerts and on theses pages
 
@@ -161,15 +174,19 @@ web:
   # GET / is the watch board: tokens in tiers 1–4 right now, from the bot's
   # memory, plus the feed of alerts already sent. GET /api/board is the watch
   # snapshot. GET /api/watch/{mint} is the last fomo answer for a token still
-  # being watched: thesis texts, authors and position sizes. GET /api/alerts
-  # is the feed (time, ticker, thesis count, market cap at the alert, link to
+  # being watched: thesis texts, authors and position sizes.
+  # POST /api/watch/{mint}/release takes that token off the board.
+  # POST /api/watch/release with {"mints":["..."]} takes several.
+  # Fomo checks and the 5-minute volume rechecks stop for those mints.
+  # GET /api/alerts
+  # is the feed (time, ticker, thesis count, pair volume at the alert, link to
   # the theses page). GET /api/alerts/{id} opens one call with its theses.
   # POST /api/alerts/{id}/dismiss
   # hides a call from the feed; the theses page stays. The page reloads both every
   # few seconds. Same access as the health routes below.
   # GET /health/accounts: which fomo accounts work, how many tokens are in
-  # the fomo checks right now ("watching"), plus how DexScreener answered
-  # market cap and volume for each screened token (?probe=1 checks accounts now).
+  # the fomo checks right now ("watching"), plus how Axiom answered
+  # volume for each screened token (?probe=1 checks accounts now).
   # GET /health/alerts: why an alert left later than the thesis that crossed
   # the threshold (previous fomo answer, queue lag, assembly, Telegram).
   # GET /health/resources: memory, goroutines and CPU of this process.

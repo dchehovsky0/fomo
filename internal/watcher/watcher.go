@@ -61,8 +61,8 @@ type Tier struct {
 
 type Config struct {
 	Lifetime time.Duration
-	// VolumeFor: DexScreener volume applies while the token has been in work
-	// for less than this. Zero means the whole lifetime.
+	// VolumeFor: pair volume is checked only while the token has been
+	// in tier 1 for less than this. Zero means the whole lifetime.
 	VolumeFor   time.Duration
 	MinTheses   int
 	ThesisLimit int
@@ -114,13 +114,10 @@ type item struct {
 	seen   []seenThesis
 	seenAt time.Time
 	image  string
-	// marketCap, volumeUSD and liquidityUSD are the latest DexScreener
-	// numbers. They start as the entry snapshot and move on each recheck
-	// while the token is still in tiers 1–3.
-	marketCap    float64
-	volumeUSD    float64
-	liquidityUSD float64
-	quoteAt      time.Time
+	// volume is the latest Axiom pair volume. It starts as the entry
+	// sample and moves on each recheck while the token is still in tiers 1–3.
+	volume   domain.Volume
+	volumeAt time.Time
 	// fomoMS is how long the last fomo request for this token took.
 	fomoMS int64
 }
@@ -209,10 +206,10 @@ func (w *Watcher) Add(l domain.Token) {
 	w.mu.Unlock()
 	it := &item{
 		l: l, due: now, addedAt: now,
-		marketCap: l.EntryMarketCap, volumeUSD: l.EntryVolumeUSD, liquidityUSD: l.EntryLiquidityUSD,
+		volume: l.EntryVolume,
 	}
-	if l.EntryMarketCap > 0 || l.EntryVolumeUSD > 0 || l.EntryLiquidityUSD > 0 {
-		it.quoteAt = now
+	if l.EntryVolume != (domain.Volume{}) {
+		it.volumeAt = now
 	}
 	if !w.syncTier(it, now) {
 		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "наблюдение этого токена уже закончено",
@@ -234,28 +231,18 @@ func (w *Watcher) Add(l domain.Token) {
 	w.poke()
 }
 
-// NoteQuote stores the latest DexScreener numbers for a token still being
-// watched. The entry snapshot on the token stays as it was at admission.
-func (w *Watcher) NoteQuote(mint string, marketCap, volume, liquidity float64, volumeKnown bool, image string, at time.Time) {
+// NoteVolume stores the latest Axiom pair volume for a token still being
+// watched. Zero is a real sample: nobody traded in the window. The entry
+// sample on the token stays as it was at admission.
+func (w *Watcher) NoteVolume(mint string, v domain.Volume, at time.Time) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	it := w.items[mint]
 	if it == nil || it.gone {
 		return
 	}
-	if marketCap > 0 {
-		it.marketCap = marketCap
-	}
-	if volumeKnown {
-		it.volumeUSD = volume
-	}
-	if liquidity > 0 {
-		it.liquidityUSD = liquidity
-	}
-	if picture := domain.PictureURL(image); picture != "" && it.image == "" && it.l.ImageURL == "" {
-		it.l.ImageURL = picture
-	}
-	it.quoteAt = at
+	it.volume = v
+	it.volumeAt = at
 }
 
 // SetTiers turns on tier marks. Without it the watch runs as before.
@@ -273,7 +260,7 @@ func (w *Watcher) Tokens() []domain.Token {
 }
 
 // Release stops watching mint. A check already in flight is not turned into
-// another one.
+// another one, and a later launch of the same mint is not taken again.
 func (w *Watcher) Release(mint string) bool {
 	w.mu.Lock()
 	it, ok := w.items[mint]
@@ -287,9 +274,35 @@ func (w *Watcher) Release(mint string) bool {
 		heap.Remove(&w.queue, it.idx)
 	}
 	w.mu.Unlock()
-	// A token dropped for flat volume does not move to the next tier.
+	// A token dropped for low volume, or taken off the board, does not move
+	// to the next tier and is not watched again.
 	w.markStatus(mint, "dropped", w.now())
 	return true
+}
+
+// ReleaseMints stops each mint that is still watched. Unknown mints are
+// skipped. The result is how many actually left the watch list.
+func (w *Watcher) ReleaseMints(mints []string) int {
+	n := 0
+	seen := map[string]struct{}{}
+	for _, mint := range mints {
+		if _, ok := seen[mint]; ok {
+			continue
+		}
+		seen[mint] = struct{}{}
+		w.mu.Lock()
+		symbol := ""
+		if it := w.items[mint]; it != nil {
+			symbol = it.l.Symbol
+		}
+		w.mu.Unlock()
+		if w.Release(mint) {
+			n++
+			w.log.Info("flow", "step", "наблюдение", "decision", "снят", "why", "убрали с доски",
+				"token", mint, "ticker", symbol)
+		}
+	}
+	return n
 }
 
 func (w *Watcher) Run(ctx context.Context) {
@@ -377,6 +390,14 @@ func (w *Watcher) poke() {
 	}
 }
 
+// finished reports that mint was taken off the watch list, including a
+// release that happened after this check was already pulled from the queue.
+func (w *Watcher) finished(it *item) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return it.gone || w.items[it.l.Mint] != it
+}
+
 func (w *Watcher) reschedule(it *item, due time.Time) {
 	w.mu.Lock()
 	if it.gone || w.items[it.l.Mint] != it {
@@ -422,6 +443,9 @@ func (w *Watcher) drop(it *item) {
 // hands the item straight to the other accounts and returns how long this
 // account should rest.
 func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, error) {
+	if w.finished(it) {
+		return 0, nil
+	}
 	now := w.now()
 	w.mu.Lock()
 	lag := now.Sub(it.due)
@@ -445,6 +469,9 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 		return 0, nil
 	}
 
+	if w.finished(it) {
+		return 0, nil
+	}
 	w.log.Info("flow", "step", "fomo", "status", "запрос",
 		"account", w.accounts[acc].Name, "token", it.l.Mint, "ticker", it.l.Symbol, "check", it.checks+1)
 	started := time.Now()
@@ -494,6 +521,9 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	w.publishPage(it, page, seen)
 
 	if seenN >= w.cfg.MinTheses {
+		if w.finished(it) {
+			return 0, nil
+		}
 		w.logCheck(acc, it, took, lag, "threshold", seenN, 0, nil, page)
 		w.signal(ctx, it, page, finished, it.due, started, seen, took)
 		return 0, nil
@@ -718,11 +748,14 @@ func (w *Watcher) signal(ctx context.Context, it *item, page *fomo.TokenThesisPa
 	}
 	n := page.Observed()
 	rec := store.Signal{Token: it.l.Mint, Ticker: ticker, Count: n, SentAt: now}
+	w.mu.Lock()
+	vol, volAt := it.volume, it.volumeAt
+	w.mu.Unlock()
 
 	alert := notify.Alert{
 		Kind: notify.KindTheses, Threshold: w.cfg.MinTheses, Token: it.l.Mint, Symbol: ticker, Name: it.l.Name,
 		CreatedAt: it.l.CreatedAt, Dex: it.l.Dex, DetectedAt: now, CountKnown: true, Count: n,
-		Tier: w.tierNumber(w.inWork(it, now)), FomoMS: nonNegMS(fomoTook),
+		Volume: vol, VolumeAt: volAt, Tier: w.tierNumber(w.inWork(it, now)), FomoMS: nonNegMS(fomoTook),
 	}
 	asmStart := time.Now()
 	if w.cfg.Complete != nil {
@@ -810,7 +843,7 @@ func (w *Watcher) inWork(it *item, now time.Time) time.Duration {
 	return now.Sub(start)
 }
 
-// VolumeTokens are the tokens still in tiers 1–3, the ones whose 24h volume
+// VolumeTokens are the tokens still in tiers 1–3, the ones whose pair volume
 // is still checked. Tier 4 is past VolumeFor and is left out.
 func (w *Watcher) VolumeTokens() []domain.Token {
 	now := w.now()
@@ -1081,7 +1114,7 @@ func dominantCause(d Delay) string {
 	ms := func(v int64) string { return shortDur(time.Duration(v) * time.Millisecond) }
 	var lines []string
 	if d.NotWatchedMS >= causeMin.Milliseconds() {
-		lines = append(lines, fmt.Sprintf("%d-й тезис появился до того, как токен попал в работу (%s, ждал проверку DexScreener): %s",
+		lines = append(lines, fmt.Sprintf("%d-й тезис появился до того, как токен попал в работу (%s, ждал проверку объёма): %s",
 			n, clock(d.AddedAt), ms(d.NotWatchedMS)))
 	}
 	if d.BlindMS >= causeMin.Milliseconds() {

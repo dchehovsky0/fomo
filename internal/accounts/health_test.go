@@ -166,18 +166,18 @@ func TestHandlerReportsTokensInWork(t *testing.T) {
 	}
 }
 
-func TestHandlerIncludesDexScreener(t *testing.T) {
+func TestHandlerIncludesAxiom(t *testing.T) {
 	r := NewRegistry(slog.New(slog.NewTextHandler(io.Discard, nil)))
 	r.Add("a", "", 1)
-	r.SetDexScreener(func() any { return map[string]int{"tokens": 3} })
+	r.SetAxiom(func() any { return map[string]int{"tokens": 3} })
 	rec := httptest.NewRecorder()
 	r.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health/accounts", nil))
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	dex, _ := body["dexscreener"].(map[string]any)
-	if dex["tokens"] != float64(3) {
-		t.Fatalf("dexscreener = %v", body["dexscreener"])
+	ax, _ := body["axiom"].(map[string]any)
+	if ax["tokens"] != float64(3) {
+		t.Fatalf("axiom = %v", body["axiom"])
 	}
 }

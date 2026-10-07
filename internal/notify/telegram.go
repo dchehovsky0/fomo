@@ -64,7 +64,7 @@ func (t *Telegram) Send(ctx context.Context, a Alert) error {
 	if err != nil {
 		// The page is written before Telegram answers. A failed send used to
 		// leave that page in the feed, and the retry half a minute later wrote
-		// a second one with a fresh market cap.
+		// a second one with a fresh volume sample.
 		discardPage(t.pages, a.PageURL, t.log)
 		t.log.Warn("telegram send failed", "token", a.Token, "kind", a.Kind,
 			"took", time.Since(started).Round(time.Millisecond), "err", err)

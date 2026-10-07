@@ -18,7 +18,7 @@ type Registry struct {
 	prev     map[string]State
 	demand   func() float64
 	watching func() int
-	dex      func() any
+	axiom    func() any
 }
 
 func NewRegistry(log *slog.Logger) *Registry {
@@ -50,11 +50,11 @@ func (r *Registry) SetWatching(fn func() int) {
 	r.mu.Unlock()
 }
 
-// SetDexScreener attaches the screen's report. The health handler includes it
-// as "dexscreener" next to the accounts.
-func (r *Registry) SetDexScreener(fn func() any) {
+// SetAxiom attaches the cap screen's report. The health handler includes it
+// as "axiom" next to the accounts.
+func (r *Registry) SetAxiom(fn func() any) {
 	r.mu.Lock()
-	r.dex = fn
+	r.axiom = fn
 	r.mu.Unlock()
 }
 
@@ -197,14 +197,14 @@ func (r *Registry) Handler() http.Handler {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 		r.mu.Lock()
-		dex := r.dex
+		ax := r.axiom
 		r.mu.Unlock()
 		body := struct {
 			Report
-			DexScreener any `json:"dexscreener,omitempty"`
+			Axiom any `json:"axiom,omitempty"`
 		}{Report: rep}
-		if dex != nil {
-			body.DexScreener = dex()
+		if ax != nil {
+			body.Axiom = ax()
 		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")

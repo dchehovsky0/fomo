@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"fomobot/internal/domain"
 	"fomobot/internal/notify"
 )
 
@@ -23,6 +24,8 @@ func TestResources(t *testing.T) {
 	if !strings.Contains(body, `"goroutines"`) || !strings.Contains(body, `"heap_inuse"`) || !strings.Contains(body, `"cpu_seconds"`) {
 		t.Fatalf("body %s", body)
 	}
+	// Windows clock ticks are coarse: back-to-back requests can share a timestamp.
+	time.Sleep(20 * time.Millisecond)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health/resources", nil))
 	if !strings.Contains(rec.Body.String(), `"cpu_percent_recent"`) {
@@ -81,7 +84,8 @@ func TestSaveAndServe(t *testing.T) {
 	now := time.Now()
 	url, err := s.Save(notify.Alert{
 		Kind: notify.KindTheses, Threshold: 3, Token: "MINT", Symbol: "CAT", Name: "Cat <script>", Chain: "Solana",
-		CreatedAt: now.Add(-time.Hour), DetectedAt: now, MarketCap: 1_500_000, CountKnown: true, Count: 3,
+		CreatedAt: now.Add(-time.Hour), DetectedAt: now, CountKnown: true, Count: 3,
+		Volume: domain.Volume{USD5m: 1_500, USD1h: 45_300}, VolumeAt: now.Add(-5 * time.Minute),
 		RateKnown: true, Recent: 2, RateWindow: 10 * time.Minute, FirstExact: true,
 		FomoURL: "https://fomo.family/tokens/solana/MINT", AxiomURL: "https://axiom.trade/meme/POOL?chain=sol",
 		First: []notify.Thesis{
@@ -104,7 +108,8 @@ func TestSaveAndServe(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, body)
 	}
 	for _, want := range []string{"$CAT", "Cat &lt;script&gt;", "alice", "line one\n&lt;b&gt;bold?&lt;/b&gt;", "second",
-		"$1,234", "https://axiom.trade/meme/POOL?chain=sol", "MINT"} {
+		"$1,234", "https://axiom.trade/meme/POOL?chain=sol", "MINT",
+		"<i>1ч</i>$45.3K", "<i>5м</i>$1.5K", "замер за 5 мин до алерта"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page missing %q", want)
 		}

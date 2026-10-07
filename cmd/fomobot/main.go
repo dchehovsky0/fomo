@@ -21,7 +21,7 @@ import (
 	"fomobot/internal/axiom"
 	"fomobot/internal/config"
 	"fomobot/internal/db"
-	"fomobot/internal/dexscreener"
+	"fomobot/internal/domain"
 	"fomobot/internal/fomo"
 	"fomobot/internal/launches"
 	"fomobot/internal/notify"
@@ -35,16 +35,17 @@ import (
 
 func main() {
 	var (
-		configPath   = flag.String("config", "config.yaml", "path to config file")
-		envPath      = flag.String("env", "", "path to .env file with secrets (default: .env next to the config)")
-		login        = flag.Bool("login", false, "open Chrome on an account's profile to log in to fomo.family (session.mode=chromedp)")
-		loginAll     = flag.Bool("login-all", false, "check every account and open Chrome, one by one, for those without a fomo login")
-		account      = flag.String("account", "", "account name for -login (default: the first account)")
-		axiomLogin   = flag.Bool("axiom-login", false, "open Chrome on the Axiom profile to log in to axiom.trade")
-		check        = flag.Bool("check", false, "wait for a new token from Axiom, check every fomo account once and exit")
-		testTelegram = flag.Bool("test-telegram", false, "send a sample signal to Telegram and exit")
-		dryRun       = flag.Bool("dry-run", false, "print signals to the console instead of Telegram")
-		record       = flag.Bool("record", false, "record everything seen on fomo to PostgreSQL (database.url), no alerts")
+		configPath      = flag.String("config", "config.yaml", "path to config file")
+		envPath         = flag.String("env", "", "path to .env file with secrets (default: .env next to the config)")
+		login           = flag.Bool("login", false, "open Chrome on an account's profile to log in to fomo.family (session.mode=chromedp)")
+		loginAll        = flag.Bool("login-all", false, "check every account and open Chrome, one by one, for those without a fomo login")
+		account         = flag.String("account", "", "account name for -login (default: the first account)")
+		axiomLogin      = flag.Bool("axiom-login", false, "open Chrome on the Axiom profile to log in to axiom.trade")
+		axiomStatsLogin = flag.Bool("axiom-stats-login", false, "open Chrome on the stats profile to log in to a second axiom.trade account")
+		check           = flag.Bool("check", false, "wait for a new token from Axiom, check every fomo account once and exit")
+		testTelegram    = flag.Bool("test-telegram", false, "send a sample signal to Telegram and exit")
+		dryRun          = flag.Bool("dry-run", false, "print signals to the console instead of Telegram")
+		record          = flag.Bool("record", false, "record everything seen on fomo to PostgreSQL (database.url), no alerts")
 	)
 	flag.Parse()
 
@@ -75,6 +76,8 @@ func main() {
 		err = runLoginAll(ctx, cfg, log)
 	case *axiomLogin:
 		err = runAxiomLogin(ctx, cfg)
+	case *axiomStatsLogin:
+		err = runAxiomStatsLogin(ctx, cfg)
 	case *testTelegram:
 		err = runTestTelegram(ctx, cfg, log)
 	case *check:
@@ -181,13 +184,22 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 		pages.HandleAdmin("GET /health/alerts", w.DelayHandler())
 		pages.HandleAdmin("GET /api/board", w.BoardHandler(cfg.Telegram.TokenLinkTemplate, cfg.Telegram.AxiomLinkTemplate))
 		pages.HandleAdmin("GET /api/watch/{mint}", w.LiveHandler(cfg.Telegram.TokenLinkTemplate, cfg.Telegram.AxiomLinkTemplate))
+		pages.HandleAdmin("POST /api/watch/release", w.ReleaseHandler())
+		pages.HandleAdmin("POST /api/watch/{mint}/release", w.ReleaseHandler())
 	}
-	gate, err := newScreen(cfg, log)
+	var stats *axiom.StatsPage
+	if cfg.Screen.MinVolume5m > 0 {
+		stats, err = newStatsPage(cfg, log)
+		if err != nil {
+			return err
+		}
+	}
+	gate, err := newScreen(cfg, stats, log)
 	if err != nil {
 		return err
 	}
 	if gate != nil {
-		health.SetDexScreener(func() any { return gate.Health() })
+		health.SetAxiom(func() any { return gate.Health() })
 	}
 
 	var stream *trending.Stream
@@ -219,9 +231,9 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 
 	var wg sync.WaitGroup
 	if gate != nil {
+		wg.Go(func() { stats.Run(ctx) })
 		wg.Go(func() { src.Run(ctx, gate.Add) })
-		wg.Go(func() { gate.Run(ctx, w.Add) })
-		wg.Go(func() { gate.Recheck(ctx, w) })
+		wg.Go(func() { gate.Run(ctx, w.Add, w) })
 	} else {
 		wg.Go(func() { src.Run(ctx, w.Add) })
 	}
@@ -395,7 +407,8 @@ func sampleAlert(cfg config.Config) notify.Alert {
 	token := "So11111111111111111111111111111111111111112"
 	a := notify.Alert{
 		Kind: notify.KindTheses, Threshold: cfg.Watch.MinTheses, Token: token, Symbol: "TEST", Name: "Test Token",
-		Chain: "Solana", Dex: "pumpfun", CreatedAt: created, DetectedAt: now, MarketCap: 1_200_000,
+		Chain: "Solana", Dex: "pumpfun", CreatedAt: created, DetectedAt: now,
+		Volume: domain.Volume{USD5m: 4_800, USD1h: 61_300, Trades5m: 140, Trades1h: 1_920}, VolumeAt: now,
 		CountKnown: true, Count: 3, RateKnown: true, Recent: 3, RateWindow: cfg.Watch.RateWindow,
 		FirstExact: true,
 		FomoURL:    strings.NewReplacer("{mint}", token, "{network}", cfg.Fomo.NetworkID).Replace(cfg.Telegram.TokenLinkTemplate),
@@ -589,6 +602,26 @@ func runAxiomLogin(ctx context.Context, cfg config.Config) error {
 	return nil
 }
 
+// runAxiomStatsLogin opens the stats profile so a second axiom account can be
+// saved there. The bot then reads pair volume from that window.
+func runAxiomStatsLogin(ctx context.Context, cfg config.Config) error {
+	if cfg.Axiom.StatsProfileDir == "" {
+		return errors.New("axiom.stats_profile_dir is empty")
+	}
+	fmt.Printf("Профиль Chrome для объёма Axiom: %s\n", cfg.Axiom.StatsProfileDir)
+	fmt.Println("Бот не должен работать: Chrome не открывает один профиль дважды.")
+	fmt.Println("1. Войди в axiom.trade другим аккаунтом, не тем, что в окне пар.")
+	fmt.Println("2. Дождись, пока загрузится Pulse, и полностью закрой это окно Chrome.")
+	err := session.Login(ctx, session.ChromeOptions{
+		AppURL: cfg.Axiom.AppURL, ProfileDir: cfg.Axiom.StatsProfileDir, ChromePath: cfg.Session.ChromePath,
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Println("Готово. При запуске бота объём пойдёт из этого окна, пары останутся в первом.")
+	return nil
+}
+
 func newAxiom(cfg config.Config, log *slog.Logger) (*axiom.Stream, error) {
 	a := cfg.Axiom
 	return axiom.NewStream(axiom.Config{
@@ -756,25 +789,46 @@ func openWatchDB(ctx context.Context, cfg config.Config, log *slog.Logger) (watc
 	return d, func() { d.Close() }, nil
 }
 
-func newScreen(cfg config.Config, log *slog.Logger) (*screen.Gate, error) {
-	if cfg.Screen.MinMarketCap <= 0 {
+func newStatsPage(cfg config.Config, log *slog.Logger) (*axiom.StatsPage, error) {
+	a := cfg.Axiom
+	return axiom.NewStatsPage(axiom.Config{
+		AppURL: a.AppURL,
+		Chrome: session.ChromeOptions{
+			ProfileDir: a.StatsProfileDir, ChromePath: cfg.Session.ChromePath,
+			Headless: a.Headless, NoSandbox: cfg.Session.NoSandbox,
+		},
+		StartTimeout: a.StartTimeout,
+	}, log.With("component", "axiom"))
+}
+
+func newScreen(cfg config.Config, stats *axiom.StatsPage, log *slog.Logger) (*screen.Gate, error) {
+	if cfg.Screen.MinVolume5m <= 0 {
 		return nil, nil
 	}
-	proxies, err := dexscreener.LoadProxies(cfg.Screen.Proxies)
-	if err != nil {
-		return nil, err
+	if stats == nil {
+		return nil, errors.New("volume screen needs the axiom stats window")
 	}
-	pool, err := dexscreener.NewPool(10*time.Second, proxies)
-	if err != nil {
-		return nil, err
-	}
-	log.Info("market cap screen", "proxies", len(proxies), "wave", pool.Limit(),
-		"min_market_cap", cfg.Screen.MinMarketCap, "volume_min_growth", cfg.Screen.MinGrowth,
-		"recheck", cfg.Screen.Recheck, "after", cfg.Screen.After)
+	log.Info("volume screen", "requests", "one at a time", "profile", cfg.Axiom.StatsProfileDir,
+		"min_volume_5m", cfg.Screen.MinVolume5m, "recheck", cfg.Screen.Recheck,
+		"after", cfg.Screen.After, "no_volume_for", cfg.Screen.NoVolumeFor)
 	return screen.New(screen.Config{
-		After: cfg.Screen.After, MinMarketCap: cfg.Screen.MinMarketCap,
-		Recheck: cfg.Screen.Recheck, MinGrowth: cfg.Screen.MinGrowth,
-	}, pool, log.With("component", "screen")), nil
+		After: cfg.Screen.After, MinVolume5m: cfg.Screen.MinVolume5m,
+		Recheck:     cfg.Screen.Recheck,
+		NoVolumeFor: cfg.Screen.NoVolumeFor,
+	}, statsWave{stats}, log.With("component", "screen")), nil
+}
+
+// statsWave asks the stats window for pair volume.
+type statsWave struct{ page *axiom.StatsPage }
+
+func (w statsWave) Limit() int { return w.page.Limit() }
+
+func (w statsWave) Wave(ctx context.Context, tokens []domain.Token) (map[string]domain.Volume, []string, error) {
+	asks := make([]axiom.Ask, len(tokens))
+	for i, tok := range tokens {
+		asks[i] = axiom.Ask{Mint: tok.Mint, Pair: tok.Pool}
+	}
+	return w.page.Volumes(ctx, asks)
 }
 
 func newAlertInfo(cfg config.Config, checkers []alertinfo.Checker, lookup alertinfo.LaunchLookup, log *slog.Logger) *alertinfo.Builder {
@@ -785,7 +839,7 @@ func newAlertInfo(cfg config.Config, checkers []alertinfo.Checker, lookup alerti
 		NetworkID:         cfg.Fomo.NetworkID,
 		FomoLinkTemplate:  cfg.Telegram.TokenLinkTemplate,
 		AxiomLinkTemplate: cfg.Telegram.AxiomLinkTemplate,
-	}, checkers, dexscreener.New(10*time.Second), lookup, log.With("component", "alertinfo"))
+	}, checkers, lookup, log.With("component", "alertinfo"))
 }
 
 func newClient(cfg config.Config, acc config.Account, tokens session.TokenSource, page fomo.PageTransport, log *slog.Logger, onCall func(fomo.CallInfo)) (*fomo.Client, error) {

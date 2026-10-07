@@ -1,5 +1,5 @@
 // Package alertinfo completes an alert with everything shown to the user:
-// the first theses, the current theses rate, market cap and links.
+// the first theses, the current theses rate and links.
 package alertinfo
 
 import (
@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"fomobot/internal/dexscreener"
 	"fomobot/internal/domain"
 	"fomobot/internal/fomo"
 	"fomobot/internal/notify"
@@ -17,10 +16,6 @@ import (
 
 type Checker interface {
 	SortedThesis(ctx context.Context, mint string, after, before time.Time, limit int) (*fomo.TokenThesisPage, error)
-}
-
-type PairSource interface {
-	Pairs(ctx context.Context, mint string) ([]dexscreener.Pair, error)
 }
 
 type LaunchLookup func(mint string) (domain.Token, bool)
@@ -40,17 +35,15 @@ type Config struct {
 }
 
 type Builder struct {
-	cfg       Config
-	checkers  []Checker
-	next      atomic.Uint64
-	pairs     PairSource
-	lookup    LaunchLookup
-	log       *slog.Logger
-	now       func() time.Time
-	pumpEvery time.Duration
+	cfg      Config
+	checkers []Checker
+	next     atomic.Uint64
+	lookup   LaunchLookup
+	log      *slog.Logger
+	now      func() time.Time
 }
 
-func New(cfg Config, checkers []Checker, pairs PairSource, lookup LaunchLookup, log *slog.Logger) *Builder {
+func New(cfg Config, checkers []Checker, lookup LaunchLookup, log *slog.Logger) *Builder {
 	if cfg.FirstN <= 0 {
 		cfg.FirstN = 3
 	}
@@ -67,15 +60,9 @@ func New(cfg Config, checkers []Checker, pairs PairSource, lookup LaunchLookup, 
 		cfg.Since = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
 	return &Builder{
-		cfg: cfg, checkers: checkers, pairs: pairs, lookup: lookup, log: log, now: time.Now,
-		pumpEvery: 3 * time.Second,
+		cfg: cfg, checkers: checkers, lookup: lookup, log: log, now: time.Now,
 	}
 }
-
-// How many times a Pump AMM alert asks DexScreener while the cap is still
-// missing. The calls are pumpEvery apart. A cap on an earlier answer stops
-// the loop, and the alert is sent with whatever the last answer held.
-const pumpAMMTries = 15
 
 // Complete fills the alert. hint is a thesis page already fetched for the
 // token, if any; it saves requests when it holds every thesis.
@@ -94,7 +81,7 @@ func (b *Builder) Complete(ctx context.Context, a notify.Alert, hint *fomo.Token
 		a.FomoURL = strings.NewReplacer("{mint}", a.Token, "{network}", b.cfg.NetworkID).Replace(b.cfg.FomoLinkTemplate)
 	}
 	marketStart := time.Now()
-	b.addMarket(ctx, &a)
+	b.addMarket(&a)
 	market := time.Since(marketStart)
 	var queries int
 	thesesStart := time.Now()
@@ -105,55 +92,13 @@ func (b *Builder) Complete(ctx context.Context, a notify.Alert, hint *fomo.Token
 		"market", market.Round(time.Millisecond),
 		"theses", time.Since(thesesStart).Round(time.Millisecond),
 		"queries", queries, "count", a.Count, "recent", a.Recent,
-		"first_exact", a.FirstExact, "mc", a.MarketCap)
+		"first_exact", a.FirstExact, "volume_5m", a.Volume.USD5m, "volume_1h", a.Volume.USD1h)
 	return a
 }
 
-func (b *Builder) addMarket(ctx context.Context, a *notify.Alert) {
+func (b *Builder) addMarket(a *notify.Alert) {
 	pair := ""
-	if b.pairs != nil {
-		tries := 1
-		if domain.PumpAMM(a.Dex) {
-			tries = pumpAMMTries
-		}
-		var pairs []dexscreener.Pair
-		for n := 1; n <= tries; n++ {
-			if n > 1 && !wait(ctx, b.pumpEvery) {
-				break
-			}
-			started := time.Now()
-			got, err := b.pairs.Pairs(ctx, a.Token)
-			took := time.Since(started).Round(time.Millisecond)
-			if err != nil {
-				b.log.Warn("dexscreener pairs", "token", a.Token, "try", n, "took", took, "err", err)
-			} else {
-				pairs = got
-				b.log.Info("dexscreener pairs", "token", a.Token, "try", n, "took", took, "pairs", len(pairs))
-			}
-			if best, ok := dexscreener.Best(pairs); ok && best.MarketCap > 0 {
-				break
-			}
-			if n < tries {
-				b.log.Info("dexscreener pairs", "token", a.Token, "try", n,
-					"why", "pump amm ещё без капы, повтор через 3с")
-			}
-		}
-		if best, ok := dexscreener.Best(pairs); ok {
-			pair = best.PairAddress
-			if a.MarketCap == 0 {
-				a.MarketCap = best.MarketCap
-			}
-		}
-		for _, p := range pairs {
-			if a.Name == "" && p.TokenName != "" {
-				a.Name = p.TokenName
-			}
-			if a.Symbol == "" && p.TokenSymbol != "" {
-				a.Symbol = p.TokenSymbol
-			}
-		}
-	}
-	if pair == "" && b.lookup != nil {
+	if b.lookup != nil {
 		if l, ok := b.lookup(a.Token); ok {
 			pair = l.Pool
 		}
@@ -163,20 +108,6 @@ func (b *Builder) addMarket(ctx context.Context, a *notify.Alert) {
 	}
 	if b.cfg.AxiomLinkTemplate != "" {
 		a.AxiomURL = strings.NewReplacer("{pair}", pair, "{mint}", a.Token).Replace(b.cfg.AxiomLinkTemplate)
-	}
-}
-
-func wait(ctx context.Context, d time.Duration) bool {
-	if d <= 0 {
-		return true
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return false
-	case <-t.C:
-		return true
 	}
 }
 
@@ -285,7 +216,6 @@ func (b *Builder) setLatest(a *notify.Alert, items []fomo.Thesis) {
 	a.Latest = notify.ThesesFrom(sorted)
 }
 func (b *Builder) fromItems(a *notify.Alert, items []fomo.Thesis) {
-	var latest fomo.Thesis
 	for _, t := range items {
 		if a.ImageURL == "" && t.TokenImageURL != "" {
 			a.ImageURL = t.TokenImageURL
@@ -293,12 +223,6 @@ func (b *Builder) fromItems(a *notify.Alert, items []fomo.Thesis) {
 		if a.Symbol == "" && t.Ticker != "" {
 			a.Symbol = t.Ticker
 		}
-		if t.CreatedAt.After(latest.CreatedAt) {
-			latest = t
-		}
-	}
-	if a.MarketCap == 0 {
-		a.MarketCap = latest.MarketCapAtCreation
 	}
 }
 

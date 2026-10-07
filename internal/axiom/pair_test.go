@@ -16,9 +16,9 @@ func TestParseNewPair(t *testing.T) {
 	want := Pair{
 		Token: "A2Pfj8iAATQ8YetDdMTXveEvLt4MxjwUubsgyGkaJcZY", Pair: "7ACwXXCiXDYyJdstfUCmiQmcxK4zjJVWnFMESk9XsfPG",
 		Name: "ひきこもり", Ticker: "HIKIKOMORI", Protocol: "Virtual Curve", DisplayProtocol: "Virtual Curve",
-		Deployer:  "FWudqzqpPGCjr11gDhn3AMbmnQq46oV6u56WBjyrdBpw",
+		Deployer:     "FWudqzqpPGCjr11gDhn3AMbmnQq46oV6u56WBjyrdBpw",
 		LiquiditySOL: 30,
-		CreatedAt: time.Date(2026, 9, 29, 12, 28, 31, 625_000_000, time.UTC),
+		CreatedAt:    time.Date(2026, 9, 29, 12, 28, 31, 625_000_000, time.UTC),
 	}
 	if !p.CreatedAt.Equal(want.CreatedAt) {
 		t.Errorf("created = %v, want %v", p.CreatedAt, want.CreatedAt)

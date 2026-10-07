@@ -19,26 +19,27 @@ type Feed struct {
 	Alerts []FeedItem `json:"alerts"`
 }
 
-// FeedItem is one sent alert. MarketCap is the cap at the moment the alert
-// was assembled. PageURL is the theses page on this server.
+// FeedItem is one sent alert. Volume is the pair's last Axiom sample when the
+// alert was assembled, taken at VolumeAt. PageURL is the theses page on this server.
 type FeedItem struct {
-	ID        string       `json:"id"`
-	At        time.Time    `json:"at"`
-	Kind      string       `json:"kind"`
-	Mint      string       `json:"mint"`
-	Symbol    string       `json:"symbol"`
-	Name      string       `json:"name"`
-	Dex       string       `json:"dex,omitempty"`
-	Theses    int          `json:"theses"`
-	MarketCap float64      `json:"market_cap"`
-	PageURL   string       `json:"page_url"`
-	FomoURL   string       `json:"fomo_url,omitempty"`
-	AxiomURL  string       `json:"axiom_url,omitempty"`
-	Chain     string       `json:"chain,omitempty"`
-	Tier      int          `json:"tier,omitempty"`
-	ImageURL  string       `json:"image_url,omitempty"`
-	FomoMS    int64        `json:"fomo_ms,omitempty"`
-	Snippets  []FeedThesis `json:"snippets,omitempty"`
+	ID     string    `json:"id"`
+	At     time.Time `json:"at"`
+	Kind   string    `json:"kind"`
+	Mint   string    `json:"mint"`
+	Symbol string    `json:"symbol"`
+	Name   string    `json:"name"`
+	Dex    string    `json:"dex,omitempty"`
+	Theses int       `json:"theses"`
+	domain.Volume
+	VolumeAt time.Time    `json:"volume_at,omitzero"`
+	PageURL  string       `json:"page_url"`
+	FomoURL  string       `json:"fomo_url,omitempty"`
+	AxiomURL string       `json:"axiom_url,omitempty"`
+	Chain    string       `json:"chain,omitempty"`
+	Tier     int          `json:"tier,omitempty"`
+	ImageURL string       `json:"image_url,omitempty"`
+	FomoMS   int64        `json:"fomo_ms,omitempty"`
+	Snippets []FeedThesis `json:"snippets,omitempty"`
 }
 
 // FeedThesis is one thesis shown in the feed row. Newest first.
@@ -129,7 +130,7 @@ func (s *Server) readAlert(id string) (FeedItem, bool) {
 	}
 	return FeedItem{
 		ID: id, At: at, Kind: a.Kind, Mint: a.Token, Symbol: a.Symbol, Name: a.Name, Dex: a.Dex,
-		Theses: a.Count, MarketCap: a.MarketCap, PageURL: "/t/" + id,
+		Theses: a.Count, Volume: a.Volume, VolumeAt: a.VolumeAt, PageURL: "/t/" + id,
 		FomoURL: a.FomoURL, AxiomURL: a.AxiomURL, Chain: a.Chain, Tier: a.Tier, ImageURL: alertImage(a),
 		FomoMS: a.FomoMS, Snippets: feedSnippets(a),
 	}, true
@@ -165,16 +166,17 @@ func feedSnippets(a notify.Alert) []FeedThesis {
 
 // TokenDetail is one opened call: the token and the theses saved with it.
 type TokenDetail struct {
-	ID        string         `json:"id"`
-	At        time.Time      `json:"at"`
-	Mint      string         `json:"mint"`
-	Symbol    string         `json:"symbol"`
-	Name      string         `json:"name"`
-	Chain     string         `json:"chain,omitempty"`
-	Dex       string         `json:"dex,omitempty"`
-	Tier      int            `json:"tier,omitempty"`
-	ImageURL  string         `json:"image_url,omitempty"`
-	MarketCap float64        `json:"market_cap"`
+	ID       string    `json:"id"`
+	At       time.Time `json:"at"`
+	Mint     string    `json:"mint"`
+	Symbol   string    `json:"symbol"`
+	Name     string    `json:"name"`
+	Chain    string    `json:"chain,omitempty"`
+	Dex      string    `json:"dex,omitempty"`
+	Tier     int       `json:"tier,omitempty"`
+	ImageURL string    `json:"image_url,omitempty"`
+	domain.Volume
+	VolumeAt  time.Time      `json:"volume_at,omitzero"`
 	Count     int            `json:"count"`
 	CreatedAt time.Time      `json:"created_at,omitzero"`
 	FomoURL   string         `json:"fomo_url,omitempty"`
@@ -216,7 +218,7 @@ func (s *Server) readToken(id string) (TokenDetail, bool) {
 	}
 	return TokenDetail{
 		ID: id, At: at, Mint: a.Token, Symbol: a.Symbol, Name: a.Name, Chain: a.Chain, Dex: a.Dex,
-		Tier: a.Tier, ImageURL: alertImage(a), MarketCap: a.MarketCap, Count: a.Count, CreatedAt: a.CreatedAt,
+		Tier: a.Tier, ImageURL: alertImage(a), Volume: a.Volume, VolumeAt: a.VolumeAt, Count: a.Count, CreatedAt: a.CreatedAt,
 		FomoURL: a.FomoURL, AxiomURL: a.AxiomURL, PageURL: "/t/" + id, FomoMS: a.FomoMS, Theses: detailTheses(a),
 	}, true
 }

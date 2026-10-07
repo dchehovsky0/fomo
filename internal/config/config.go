@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"fomobot/internal/dexscreener"
+	"fomobot/internal/proxy"
 
 	"gopkg.in/yaml.v3"
 )
@@ -70,7 +70,10 @@ type Axiom struct {
 	AppURL     string   `yaml:"app_url"`
 	Clusters   []string `yaml:"clusters"`
 	ProfileDir string   `yaml:"chrome_profile_dir"`
-	Headless   bool     `yaml:"headless"`
+	// StatsProfileDir is a second Chrome, logged into another axiom account.
+	// Pair volume (pair-stats-v4) is read there. The pair socket stays in ProfileDir.
+	StatsProfileDir string `yaml:"stats_profile_dir"`
+	Headless        bool   `yaml:"headless"`
 	// Cookies written into the profile when it lacks them or they changed
 	// here; after that the site refreshes them itself.
 	AccessToken  string `yaml:"access_token"`
@@ -78,31 +81,34 @@ type Axiom struct {
 	CFClearance  string `yaml:"cf_clearance"`
 	// Protocols: only pairs of these protocols; empty = all.
 	Protocols []string `yaml:"protocols"`
-	// SkipProtocols never reach DexScreener, the fomo checks or alerts.
+	// SkipProtocols never reach the volume check, the fomo checks or alerts.
 	SkipProtocols []string      `yaml:"skip_protocols"`
 	StallTimeout  time.Duration `yaml:"stall_timeout"`
 	StartTimeout  time.Duration `yaml:"start_timeout"`
 }
 
-// Screen asks DexScreener for market cap After the token is created.
-// Below MinMarketCap the token never reaches the fomo checks. An empty
-// answer is asked again and does not drop the token. Volume is not an entry filter.
-// Proxies is a file of socks5://user:pass@host:port lines; each proxy checks
-// 30 tokens, so 10 proxies check 300 per wave.
-// Recheck asks DexScreener for volume.h24 while the token is in tiers 1–3.
-// MinGrowth is the minimum fractional rise between samples (0.05 = 5%).
-// Two samples in a row under that rise drop the token. See TOKEN_TIERS.md.
+// Screen asks Axiom for the pair's 5-minute volume (buys plus sells, USD)
+// After the token is created. At or below MinVolume5m the token never reaches
+// the fomo checks. A pair with no trades yet is asked again until NoVolumeFor
+// after creation.
+// Proxies is a file of socks5://user:pass@host:port lines assigned to fomo
+// accounts that do not set one. The volume check does not use them: it runs
+// in the axiom stats window (axiom.stats_profile_dir).
+// Recheck samples the volume again while the token is in tiers 1–3. Three
+// samples in a row under MinVolume5m drop the token. See TOKEN_TIERS.md.
 type Screen struct {
-	After        time.Duration `yaml:"after"`
-	MinMarketCap float64       `yaml:"min_market_cap"`
-	Recheck      time.Duration `yaml:"recheck"`
-	MinGrowth    float64       `yaml:"volume_min_growth"`
-	Proxies      string        `yaml:"proxies"`
+	After       time.Duration `yaml:"after"`
+	MinVolume5m float64       `yaml:"min_volume_5m"`
+	Recheck     time.Duration `yaml:"recheck"`
+	// NoVolumeFor: a pair that still has no trades this long after creation
+	// is dropped on that answer. Axiom not answering is not that.
+	NoVolumeFor time.Duration `yaml:"no_volume_for"`
+	Proxies     string        `yaml:"proxies"`
 }
 
 type Watch struct {
 	Lifetime time.Duration `yaml:"lifetime"`
-	// VolumeFor: DexScreener volume is checked only while the token has been
+	// VolumeFor: pair volume is checked only while the token has been
 	// in tier 1 for less than this. Zero means the whole lifetime.
 	VolumeFor   time.Duration `yaml:"volume_for"`
 	MinTheses   int           `yaml:"min_theses"`
@@ -249,17 +255,18 @@ func Default() Config {
 				"wss://cluster9.axiom.trade/", "wss://cluster3.axiom.trade/",
 				"wss://cluster5.axiom.trade/", "wss://cluster7.axiom.trade/",
 			},
-			ProfileDir:    "./axiom-profile",
-			StallTimeout:  3 * time.Minute,
-			StartTimeout:  90 * time.Second,
-			SkipProtocols: []string{"Meteora AMM V2", "Meteora DLMM", "Raydium CLMM", "Orca"},
+			ProfileDir:      "./axiom-profile",
+			StatsProfileDir: "./axiom-stats-profile",
+			StallTimeout:    3 * time.Minute,
+			StartTimeout:    90 * time.Second,
+			SkipProtocols:   []string{"Meteora AMM V2", "Meteora DLMM", "Raydium CLMM", "Orca"},
 		},
 		Screen: Screen{
-			After:        10 * time.Second,
-			MinMarketCap: 7_000,
-			Recheck:      30 * time.Second,
-			MinGrowth:    0.05,
-			Proxies:      "./proxies.txt",
+			After:       10 * time.Second,
+			MinVolume5m: 5_000,
+			Recheck:     30 * time.Second,
+			NoVolumeFor: 2 * time.Minute,
+			Proxies:     "./proxies.txt",
 		},
 		Watch: Watch{
 			Lifetime:    49*time.Hour + 50*time.Minute,
@@ -347,7 +354,7 @@ func Load(path string) (Config, error) {
 		cfg.Log.Dir = "./logs"
 	}
 	dir := filepath.Dir(path)
-	paths := []*string{&cfg.Session.TokenFile, &cfg.Session.ChromeProfileDir, &cfg.Axiom.ProfileDir, &cfg.Screen.Proxies, &cfg.Store.Path, &cfg.Web.PagesDir, &cfg.Log.Dir}
+	paths := []*string{&cfg.Session.TokenFile, &cfg.Session.ChromeProfileDir, &cfg.Axiom.ProfileDir, &cfg.Axiom.StatsProfileDir, &cfg.Screen.Proxies, &cfg.Store.Path, &cfg.Web.PagesDir, &cfg.Log.Dir}
 	for i := range cfg.Accounts {
 		paths = append(paths, &cfg.Accounts[i].ChromeProfileDir, &cfg.Accounts[i].TokenFile)
 	}
@@ -378,7 +385,7 @@ func (c *Config) fillAccountProxies() error {
 	if !need || c.Screen.Proxies == "" {
 		return nil
 	}
-	proxies, err := dexscreener.LoadProxies(c.Screen.Proxies)
+	proxies, err := proxy.Load(c.Screen.Proxies)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -496,6 +503,18 @@ func (c *Config) Validate() error {
 	for _, a := range c.Accounts {
 		if a.ChromeProfileDir != "" && filepath.Clean(a.ChromeProfileDir) == filepath.Clean(ax.ProfileDir) {
 			errs = append(errs, fmt.Errorf("axiom.chrome_profile_dir %s is used by account %s", ax.ProfileDir, a.Name))
+		}
+	}
+	if c.Screen.MinVolume5m > 0 {
+		if ax.StatsProfileDir == "" {
+			errs = append(errs, errors.New("axiom.stats_profile_dir is required"))
+		} else if filepath.Clean(ax.StatsProfileDir) == filepath.Clean(ax.ProfileDir) {
+			errs = append(errs, errors.New("axiom.stats_profile_dir must differ from axiom.chrome_profile_dir"))
+		}
+		for _, a := range c.Accounts {
+			if a.ChromeProfileDir != "" && ax.StatsProfileDir != "" && filepath.Clean(a.ChromeProfileDir) == filepath.Clean(ax.StatsProfileDir) {
+				errs = append(errs, fmt.Errorf("axiom.stats_profile_dir %s is used by account %s", ax.StatsProfileDir, a.Name))
+			}
 		}
 	}
 	if ax.StallTimeout <= 0 || ax.StartTimeout <= 0 {

@@ -59,6 +59,7 @@ type Stats struct {
 // Stream keeps a Chrome open on Axiom with its own WebSocket joined to
 // new_pairs. The socket lives in the page so it carries the browser's
 // cookies and TLS fingerprint; its messages reach Go through a CDP binding.
+// Pair-stats reads stay out of this window: they run in StatsPage.
 type Stream struct {
 	cfg   Config
 	log   *slog.Logger

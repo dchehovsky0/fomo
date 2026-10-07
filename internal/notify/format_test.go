@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"fomobot/internal/domain"
 )
 
 var msk = time.FixedZone("MSK", 3*3600)
@@ -13,7 +15,8 @@ func sample() Alert {
 	created := now.Add(-42 * time.Minute)
 	return Alert{
 		Kind: KindTheses, Threshold: 3, Token: "MINT123", Symbol: "PRI<ORS", Name: "Priors & Co", Chain: "Solana",
-		Dex: "pumpfun", CreatedAt: created, DetectedAt: now, MarketCap: 1_200_000,
+		Dex: "pumpfun", CreatedAt: created, DetectedAt: now,
+		Volume: domain.Volume{USD5m: 1500, USD1h: 45_300}, VolumeAt: now.Add(-20 * time.Second),
 		CountKnown: true, Count: 3, RateKnown: true, Recent: 3, RateWindow: 10 * time.Minute,
 		FirstExact: true,
 		First: []Thesis{
@@ -34,7 +37,7 @@ func TestFormat(t *testing.T) {
 		"Алерт: 28.09.2026 18:00:00",
 		"Chain: Solana · pumpfun · создан 42 мин назад",
 		"CA: <code>MINT123</code>",
-		"MC: $1.2M",
+		"Объём: 1ч $45.3K · 5м $1.5K\n",
 		"Тезисов в минуту: 0.3 (3 за 10 мин) · всего 3",
 		"<b>Первые 3 тезиса:</b>",
 		"1. 17:30:00 — $27,983",
@@ -67,6 +70,37 @@ func TestFormatTrendingAndPartial(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("message missing %q:\n%s", want, got)
 		}
+	}
+}
+
+func TestFormatSubMinuteAge(t *testing.T) {
+	a := sample()
+	a.CreatedAt = a.DetectedAt.Add(-30 * time.Second)
+	a.RateWindow = 20 * time.Second
+	got := Format(a, msk)
+	for _, want := range []string{
+		"создан &lt;1 мин назад",
+		"Тезисов в минуту: 9 (3 за &lt;1 мин)",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("message missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "<1") {
+		t.Errorf("raw <1 is an invalid Telegram tag:\n%s", got)
+	}
+}
+
+func TestVolumeLine(t *testing.T) {
+	a := sample()
+	a.VolumeAt = a.DetectedAt.Add(-5 * time.Minute)
+	a.Volume = domain.Volume{USD1h: 3000}
+	if got := VolumeLine(a); got != "Объём: 1ч $3K · 5м $0 (замер 5 мин назад)" {
+		t.Errorf("stale line = %q", got)
+	}
+	a.VolumeAt = time.Time{}
+	if got := Format(a, msk); strings.Contains(got, "Объём") {
+		t.Errorf("no sample, no volume line:\n%s", got)
 	}
 }
 

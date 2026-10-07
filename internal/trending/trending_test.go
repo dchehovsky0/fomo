@@ -151,7 +151,7 @@ func TestFirstSnapshotIsBaselineThenNewTokensAlert(t *testing.T) {
 	n.mu.Lock()
 	s := n.sent[0]
 	n.mu.Unlock()
-	if s.Kind != notify.KindTrending || s.Rank != 2 || s.Symbol != "Y" || s.Name != "cat wif sword" || s.MarketCap != 1256554.89 || s.Count != 2 || s.FomoURL == "" || s.Returned {
+	if s.Kind != notify.KindTrending || s.Rank != 2 || s.Symbol != "Y" || s.Name != "cat wif sword" || s.Count != 2 || s.FomoURL == "" || s.Returned {
 		t.Errorf("signal = %+v", s)
 	}
 	if _, ok := st.TrendingLastSeen("YOUNG"); !ok {

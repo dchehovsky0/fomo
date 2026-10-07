@@ -23,11 +23,12 @@ func TestLoadRepoConfigWithEnv(t *testing.T) {
 	if cfg.Telegram.BotToken != "123456:ABC-def" || cfg.Telegram.ChatID != "-1001234567890" {
 		t.Errorf("telegram = %+v", cfg.Telegram)
 	}
-	if cfg.Watch.Lifetime != 49*time.Hour+50*time.Minute || cfg.Watch.VolumeFor != 110*time.Minute || cfg.Watch.MinTheses != 3 || cfg.Watch.ThesisLimit != 500 || len(cfg.Watch.Schedule) != 4 || cfg.Watch.Schedule[0].Every != 2*time.Second || cfg.Watch.Schedule[0].MaxAge != 20*time.Minute || cfg.Watch.Schedule[3].Every != 2*time.Minute || cfg.Screen.After != 10*time.Second || cfg.Screen.MinMarketCap != 7000 || cfg.Screen.MinGrowth != 0.05 || cfg.Screen.Recheck != 30*time.Second {
+	if cfg.Watch.Lifetime != 49*time.Hour+50*time.Minute || cfg.Watch.VolumeFor != 110*time.Minute || cfg.Watch.MinTheses != 3 || cfg.Watch.ThesisLimit != 500 || len(cfg.Watch.Schedule) != 4 || cfg.Watch.Schedule[0].Every != 2*time.Second || cfg.Watch.Schedule[0].MaxAge != 20*time.Minute || cfg.Watch.Schedule[3].Every != 2*time.Minute || cfg.Screen.After != 10*time.Second || cfg.Screen.MinVolume5m != 1000 || cfg.Screen.NoVolumeFor != 2*time.Minute || cfg.Screen.Recheck != 30*time.Second {
 		t.Errorf("watch not parsed: %+v", cfg.Watch)
 	}
 	if ax := cfg.Axiom; ax.RefreshToken != "refresh" || len(ax.Clusters) != 4 || ax.StallTimeout != 3*time.Minute ||
-		ax.ProfileDir != filepath.Join("..", "..", "axiom-profile") {
+		ax.ProfileDir != filepath.Join("..", "..", "axiom-profile") ||
+		ax.StatsProfileDir != filepath.Join("..", "..", "axiom-stats-profile") {
 		t.Errorf("axiom not parsed: %+v", ax)
 	}
 	last := cfg.Accounts[len(cfg.Accounts)-1]
@@ -96,6 +97,16 @@ accounts:
 	if _, err := Load(path); err == nil {
 		t.Error("axiom must not share a Chrome profile with an account")
 	}
+
+	os.WriteFile(path, []byte(`
+session: {mode: chromedp}
+axiom: {chrome_profile_dir: ./axiom-profile, stats_profile_dir: ./axiom-profile}
+accounts:
+  - {name: a, chrome_profile_dir: ./p}
+`), 0o600)
+	if _, err := Load(path); err == nil {
+		t.Error("stats profile must differ from the pair profile")
+	}
 }
 
 func TestAccountProxiesStayPutWhenTheRangeGrows(t *testing.T) {
@@ -109,7 +120,7 @@ func TestAccountProxiesStayPutWhenTheRangeGrows(t *testing.T) {
 		path := filepath.Join(dir, "c.yaml")
 		body := `
 session: {mode: chromedp}
-screen: {proxies: ./proxies.txt, min_market_cap: 1}
+screen: {proxies: ./proxies.txt, min_volume_5m: 1}
 accounts:
   - {name: main, chrome_profile_dir: ./chrome-profile}
 account_ranges:

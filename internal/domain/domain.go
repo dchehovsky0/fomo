@@ -28,21 +28,17 @@ type Token struct {
 	Discord      string
 	ImageURL     string
 	LiquiditySOL float64
-	// DexScreener at the moment the cap filter let the token into the watch.
-	EntryMarketCap    float64
-	EntryVolumeUSD    float64
-	EntryLiquidityUSD float64
+	// EntryVolume is the pair's volume at the moment the filter let the token in.
+	EntryVolume Volume
 }
 
-// PumpAMM reports a pool on Pump AMM. DexScreener often has no cap for
-// these on the first request, so callers poll them on a short interval.
-func PumpAMM(dex string) bool {
-	switch strings.ToLower(strings.TrimSpace(dex)) {
-	case "pump amm", "pump.amm", "Pump AMM":
-		return true
-	default:
-		return false
-	}
+// Volume is trading on the token's pair in Axiom's 5-minute and 1-hour
+// windows: buys plus sells in USD, and how many trades that was.
+type Volume struct {
+	USD5m    float64 `json:"volume_5m"`
+	USD1h    float64 `json:"volume_1h"`
+	Trades5m int     `json:"trades_5m"`
+	Trades1h int     `json:"trades_1h"`
 }
 
 // AxiomImage is the token picture Axiom keeps for a mint. The launch message
@@ -108,12 +104,14 @@ type Alert struct {
 	Rank      int    `json:"rank,omitempty"`
 	Returned  bool   `json:"returned,omitempty"`
 
-	Token     string  `json:"token"`
-	Symbol    string  `json:"symbol"`
-	Name      string  `json:"name"`
-	Chain     string  `json:"chain"`
-	ImageURL  string  `json:"image_url,omitempty"`
-	MarketCap float64 `json:"market_cap"`
+	Token    string `json:"token"`
+	Symbol   string `json:"symbol"`
+	Name     string `json:"name"`
+	Chain    string `json:"chain"`
+	ImageURL string `json:"image_url,omitempty"`
+	// Volume is the pair's last volume sample before the alert, taken at VolumeAt.
+	Volume   Volume    `json:"volume,omitzero"`
+	VolumeAt time.Time `json:"volume_at,omitzero"`
 
 	CountKnown bool `json:"count_known"`
 	Count      int  `json:"count"`

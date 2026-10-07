@@ -4,6 +4,8 @@ proxies.txt
 chrome-profile/
 profiles/
 axiom-profile/
+axiom-cap-profile/
+axiom-stats-profile/
 .axiom-chrome-profile/
 data/
 logs/

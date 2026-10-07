@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"fomobot/internal/domain"
 	"fomobot/internal/notify"
 )
 
@@ -34,13 +35,14 @@ func TestFeedListsSavedAlerts(t *testing.T) {
 	oldPage := save(notify.Alert{
 		Kind: notify.KindTheses, Token: "MINTOLD", Symbol: "OLD", Name: "Old coin", Dex: "Pump V1",
 		DetectedAt: now.Add(-48 * time.Hour), SentAt: now.Add(-48 * time.Hour),
-		Count: 4, MarketCap: 12_000, FomoURL: "https://fomo.family/tokens/solana/MINTOLD",
-		First: []notify.Thesis{{At: now.Add(-49 * time.Hour), Handle: "bob", Text: "единственный текст"}},
+		Count: 4, Volume: domain.Volume{USD5m: 300, USD1h: 12_000}, VolumeAt: now.Add(-48 * time.Hour),
+		FomoURL: "https://fomo.family/tokens/solana/MINTOLD",
+		First:   []notify.Thesis{{At: now.Add(-49 * time.Hour), Handle: "bob", Text: "единственный текст"}},
 	})
 	newPage := save(notify.Alert{
 		Kind: notify.KindTheses, Token: "MINTNEW", Symbol: "NEW", Name: "New coin", Chain: "Solana", Tier: 1,
 		DetectedAt: now.Add(-time.Hour), SentAt: now.Add(-time.Hour),
-		Count: 3, MarketCap: 80_000, FomoMS: 60188, AxiomURL: "https://axiom.trade/meme/POOL?chain=sol",
+		Count: 3, Volume: domain.Volume{USD5m: 8_000, USD1h: 80_000, Trades5m: 90}, VolumeAt: now.Add(-time.Hour), FomoMS: 60188, AxiomURL: "https://axiom.trade/meme/POOL?chain=sol",
 		Latest: []notify.Thesis{
 			{At: now.Add(-40 * time.Minute), Handle: "a", Text: "старый\nтекст"},
 			{At: now.Add(-20 * time.Minute), Handle: "b", Text: "средний"},
@@ -59,7 +61,7 @@ func TestFeedListsSavedAlerts(t *testing.T) {
 	if len(feed.Alerts) != 2 {
 		t.Fatalf("alerts = %d", len(feed.Alerts))
 	}
-	if feed.Alerts[0].Symbol != "NEW" || feed.Alerts[0].PageURL != newPage || feed.Alerts[0].Theses != 3 || feed.Alerts[0].MarketCap != 80_000 || feed.Alerts[0].Tier != 1 || feed.Alerts[0].FomoMS != 60188 {
+	if feed.Alerts[0].Symbol != "NEW" || feed.Alerts[0].PageURL != newPage || feed.Alerts[0].Theses != 3 || feed.Alerts[0].USD1h != 80_000 || feed.Alerts[0].USD5m != 8_000 || feed.Alerts[0].VolumeAt.IsZero() || feed.Alerts[0].Tier != 1 || feed.Alerts[0].FomoMS != 60188 {
 		t.Fatalf("newest: %+v", feed.Alerts[0])
 	}
 	if n := feed.Alerts[0].Snippets; len(n) != 3 || n[0].Text != "свежий" || n[2].Text != "старый текст" {
@@ -72,7 +74,7 @@ func TestFeedListsSavedAlerts(t *testing.T) {
 		t.Fatalf("fallback snippets: %+v", n)
 	}
 	again := s.Feed(now)
-	if again.Alerts[0].ID != feed.Alerts[0].ID || again.Alerts[1].MarketCap != 12_000 {
+	if again.Alerts[0].ID != feed.Alerts[0].ID || again.Alerts[1].USD1h != 12_000 {
 		t.Fatalf("cached feed: %+v", again.Alerts)
 	}
 
@@ -87,8 +89,11 @@ func TestFeedListsSavedAlerts(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Alerts) != 2 || got.Alerts[0].AxiomURL == "" {
+	if len(got.Alerts) != 2 || got.Alerts[0].AxiomURL == "" || got.Alerts[0].Trades5m != 90 {
 		t.Fatalf("api: %+v", got.Alerts)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, `"volume_5m":8000`) || !strings.Contains(body, `"volume_1h":80000`) || strings.Contains(body, "market_cap") {
+		t.Fatalf("api json: %s", body)
 	}
 
 	locked := httptest.NewRequest(http.MethodGet, "/api/alerts", nil)
@@ -114,7 +119,7 @@ func TestDismissHidesCallFromFeed(t *testing.T) {
 	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
 	u, err := s.Save(notify.Alert{
 		Kind: notify.KindTheses, Token: "MINT", Symbol: "MEW", Name: "cat",
-		DetectedAt: now, SentAt: now, Count: 3, MarketCap: 1000,
+		DetectedAt: now, SentAt: now, Count: 3,
 		First: []notify.Thesis{{At: now, Text: "кол про кота"}},
 	})
 	if err != nil {
@@ -176,7 +181,7 @@ func TestTokenDetailListsTheses(t *testing.T) {
 	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
 	u, err := s.Save(notify.Alert{
 		Kind: notify.KindTheses, Token: "MINTMEW", Symbol: "MEW", Name: "cat", Chain: "Solana", Tier: 1,
-		DetectedAt: now, SentAt: now, Count: 4, MarketCap: 2_400_000,
+		DetectedAt: now, SentAt: now, Count: 4, Volume: domain.Volume{USD5m: 2_400, USD1h: 24_000}, VolumeAt: now,
 		CreatedAt: now.Add(-2 * time.Hour),
 		Theses: []notify.Thesis{
 			{At: now.Add(-time.Hour), Handle: "early", Text: "ранний тезис", PositionUSD: 10},
@@ -212,7 +217,7 @@ func TestTokenDetailListsTheses(t *testing.T) {
 		return d
 	}
 	d := get("/api/alerts/" + id)
-	if d.Symbol != "MEW" || d.Mint != "MINTMEW" || d.Count != 4 || len(d.Theses) != 2 || d.Theses[0].PositionUSD != 10 || d.Theses[1].Text != "свежий тезис" {
+	if d.Symbol != "MEW" || d.Mint != "MINTMEW" || d.Count != 4 || d.USD1h != 24_000 || d.USD5m != 2_400 || len(d.Theses) != 2 || d.Theses[0].PositionUSD != 10 || d.Theses[1].Text != "свежий тезис" {
 		t.Fatalf("detail: %+v", d)
 	}
 	oldID := strings.TrimPrefix(old, "http://localhost:8080/t/")
@@ -232,7 +237,7 @@ func TestDiscardRemovesFailedSend(t *testing.T) {
 	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
 	pageURL, err := s.Save(notify.Alert{
 		Kind: notify.KindTheses, Token: "MINT", Symbol: "ELON", Name: "Elon", Dex: "Pump AMM",
-		DetectedAt: now, SentAt: now, Count: 7, MarketCap: 46_000,
+		DetectedAt: now, SentAt: now, Count: 7,
 		First: []notify.Thesis{{At: now, Handle: "a", Text: "текст"}},
 	})
 	if err != nil {

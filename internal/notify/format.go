@@ -99,15 +99,15 @@ func Format(a Alert, loc *time.Location) string {
 		chain = append(chain, html.EscapeString(a.Dex))
 	}
 	if !a.CreatedAt.IsZero() {
-		chain = append(chain, "создан "+humanDuration(a.DetectedAt.Sub(a.CreatedAt))+" назад")
+		chain = append(chain, "создан "+htmlDuration(a.DetectedAt.Sub(a.CreatedAt))+" назад")
 	}
 	b.WriteString(strings.Join(chain, " · ") + "\n")
 	fmt.Fprintf(&b, "CA: <code>%s</code>\n", html.EscapeString(a.Token))
-	if a.MarketCap > 0 {
-		fmt.Fprintf(&b, "MC: %s\n", CompactUSD(a.MarketCap))
+	if line := VolumeLine(a); line != "" {
+		b.WriteString(line + "\n")
 	}
 	if a.RateKnown {
-		fmt.Fprintf(&b, "Тезисов в минуту: %s (%s%d за %s)", RatePerMinute(a), capMark(a.RecentCapped), a.Recent, humanDuration(a.RateWindow))
+		fmt.Fprintf(&b, "Тезисов в минуту: %s (%s%d за %s)", html.EscapeString(RatePerMinute(a)), capMark(a.RecentCapped), a.Recent, htmlDuration(a.RateWindow))
 		if a.CountKnown {
 			fmt.Fprintf(&b, " · всего %s", groupThousands(int64(a.Count)))
 		}
@@ -147,6 +147,22 @@ func Format(a Alert, loc *time.Location) string {
 		b.WriteString("\n" + strings.Join(links, " | "))
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// volumeStale is the sample age past which the alert says how old it is.
+const volumeStale = 2 * time.Minute
+
+// VolumeLine renders the pair volume as "Объём: 1ч $4.2K · 5м $1.5K", with
+// the sample age once it is older than volumeStale. Empty without a sample.
+func VolumeLine(a Alert) string {
+	if a.VolumeAt.IsZero() {
+		return ""
+	}
+	s := fmt.Sprintf("Объём: 1ч %s · 5м %s", CompactUSD(a.Volume.USD1h), CompactUSD(a.Volume.USD5m))
+	if age := alertSentAt(a).Sub(a.VolumeAt); age > volumeStale {
+		s += " (замер " + htmlDuration(age) + " назад)"
+	}
+	return s
 }
 
 // alertSentAt is when the message was assembled and sent. DetectedAt is the
@@ -211,6 +227,12 @@ func plural(n int, one, few, many string) string {
 	default:
 		return many
 	}
+}
+
+// htmlDuration is humanDuration safe to drop into Telegram HTML.
+// "<1 мин" would otherwise be read as a start tag named "1".
+func htmlDuration(d time.Duration) string {
+	return html.EscapeString(humanDuration(d))
 }
 
 // humanDuration formats 42m as "42 мин", 3h5m as "3 ч 5 мин", 30s as "<1 мин".

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0b0d14">
 <title>Наблюдение</title>
@@ -13,6 +13,7 @@
   --blue: #60a5fa; --violet: #a78bfa; --gray: #94a3b8; --amber: #fbbf24; --red: #f87171;
 }
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
 html, body { margin: 0; min-height: 100%; color: var(--text); }
 body {
   font: 14px/1.5 "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
@@ -105,9 +106,11 @@ tbody tr:hover td { background: rgba(20, 24, 38, .92); }
   font-weight: 750; color: #fff; background: hsl(var(--h), 52%, 42%);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, .06), 0 6px 16px rgba(0, 0, 0, .28);
 }
-.sym { font-weight: 700; color: var(--text); text-decoration: none; }
+.sym { font-weight: 700; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
 a.sym:hover { color: var(--cyan); }
-.sub { color: var(--muted); font-size: 12px; }
+button.sym { max-width: 100%; }
+.who, .tok > div, .tokenhead > div { min-width: 0; }
+.sub { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .sub a { color: var(--muted); }
 .fail { color: var(--amber); }
 .slow { color: var(--amber); font-weight: 650; }
@@ -128,7 +131,7 @@ a.sym:hover { color: var(--cyan); }
 button.sym:hover { color: var(--cyan); }
 #feedView thead tr, .callgrid {
   display: grid; min-width: 980px; align-items: start;
-  grid-template-columns: minmax(220px, 250px) minmax(420px, 1fr) max-content max-content 100px;
+  grid-template-columns: minmax(220px, 250px) minmax(420px, 1fr) 212px 112px 100px;
 }
 #feedView th { position: static; }
 .calltd { position: relative; overflow: hidden; padding: 0; display: block; }
@@ -145,6 +148,18 @@ button.sym:hover { color: var(--cyan); }
   color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer;
 }
 .closecall:hover { background: #3a1420; color: var(--red); }
+.unwatch {
+  width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.unwatch:hover { background: #3a1420; color: var(--red); }
+.unwatch-all {
+  align-self: end; height: 38px; background: transparent; cursor: pointer;
+  border: 1px solid rgba(248, 113, 113, .45); color: var(--red); border-radius: 12px; padding: 0 14px;
+}
+.unwatch-all:hover { background: #3a1420; }
+.unwatch-all:disabled { opacity: .4; cursor: default; }
+.tokenhead .unwatch-all { margin-left: auto; align-self: center; }
 #feedView .tok { align-items: flex-start; }
 .av { position: relative; overflow: hidden; }
 .av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -152,9 +167,12 @@ button.sym:hover { color: var(--cyan); }
 .snips { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); gap: 16px; }
 .snip { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
 .mark { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
-.txt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+.txt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; overflow-wrap: anywhere; }
 .ago { color: var(--muted); font-size: 12px; margin-top: 3px; }
 .capbig { font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vol { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vol + .vol { margin-left: 10px; }
+.vol i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); margin-right: 3px; letter-spacing: .02em; }
 .alertwhen { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .more {
   display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
@@ -167,7 +185,7 @@ button.sym { background: none; border: 0; padding: 0; cursor: pointer; text-alig
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
   max-height: 260px; overflow: auto;
 }
-.hit { display: block; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid #1c2233; padding: 8px 12px; cursor: pointer; }
+.hit { display: block; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid #1c2233; padding: 8px 12px; cursor: pointer; white-space: normal; overflow-wrap: anywhere; }
 .hit:hover { background: var(--card2); }
 .back {
   margin: 16px 18px 0; background: rgba(18, 21, 31, .92); border: 1px solid var(--line); color: var(--cyan);
@@ -191,20 +209,140 @@ button.sym { background: none; border: 0; padding: 0; cursor: pointer; text-alig
   background: rgba(18, 21, 31, .88); border: 1px solid var(--line); border-radius: 16px;
 }
 .trow:hover { border-color: #3d4666; background: #151926; }
-.ttext { white-space: pre-wrap; }
+.ttext { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
 .copy {
   margin-left: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--muted);
   border-radius: 999px; padding: 2px 8px; cursor: pointer; font-size: 11px;
 }
 .copy:hover { color: var(--text); border-color: #3d4666; }
+@media (max-width: 1280px) {
+  #feedView thead { display: none; }
+  #feedView .tablewrap { overflow-x: clip; padding: 0 10px 16px; }
+  #feedView table, #feedView tbody, #feedView tr.call, #feedView .calltd, #feedView .sheet {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  #feedView thead tr, .callgrid {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "token actions"
+      "theses theses"
+      "vol when";
+  }
+  .callgrid > :nth-child(1) { grid-area: token; }
+  .callgrid > :nth-child(2) { grid-area: theses; }
+  .callgrid > :nth-child(3) { grid-area: vol; align-self: end; }
+  .callgrid > :nth-child(4) { grid-area: when; justify-self: end; align-self: end; }
+  .callgrid > :nth-child(5) { grid-area: actions; justify-self: end; align-self: start; padding-top: 8px; }
+  .snips { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .callgrid, .snips, .snip { min-width: 0; }
+  .callgrid .capbig { white-space: normal; }
+  #feedView tbody tr.call, #feedView .calltd { display: block; }
+  #feedView tbody tr.call { margin: 0 0 10px; }
+  #feedView .calltd { border-radius: 16px; border: 1px solid var(--line); }
+  #feedView .sheet, #feedView tbody tr:hover .sheet { border-radius: 16px; background: #12151f; }
+}
+@media (max-width: 1080px) {
+  #watchView .tablewrap { overflow: visible; padding: 0 10px 20px; }
+  #watchView table, #watchView tbody { display: block; width: 100%; min-width: 0; }
+  #watchView thead { display: none; }
+  #watchView tbody tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 12px;
+    margin: 0 0 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(18, 21, 31, .88);
+  }
+  #watchView td:nth-child(8) {
+    position: absolute; top: 6px; right: 6px; width: auto; z-index: 2;
+  }
+  #watchView td:nth-child(8)::before { content: none; display: none; }
+  #watchView td.tok { padding-right: 36px; }
+  #watchView th:first-child, #watchView td.tok { position: static; z-index: auto; }
+  #watchView td {
+    display: block;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    white-space: normal;
+  }
+  #watchView td.tok { grid-column: 1 / -1; }
+  #watchView tbody tr:hover td { background: transparent; }
+  #watchView tbody tr:hover { border-color: #3d4666; background: #151926; }
+  #watchView tbody tr td:nth-child(n+2)::before {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    font-variant-numeric: normal;
+  }
+  #watchView tbody tr td:nth-child(2)::before { content: "Тир"; }
+  #watchView tbody tr td:nth-child(3)::before { content: "Объём"; }
+  #watchView tbody tr td:nth-child(4)::before { content: "В наблюдении"; }
+  #watchView tbody tr td:nth-child(5)::before { content: "В тире ещё"; }
+  #watchView tbody tr td:nth-child(6)::before { content: "Тезисы"; }
+  #watchView tbody tr td:nth-child(7)::before { content: "Опрос"; }
+}
 @media (max-width: 860px) {
-  header { flex-wrap: wrap; gap: 10px; }
+  header {
+    flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 12px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+  }
+  .brand { min-width: 0; flex: 1 1 180px; }
   .searchwrap { max-width: none; order: 3; flex: 1 1 100%; }
-  .stats { grid-template-columns: 1fr 1fr; }
-  .live { margin-left: 0; }
+  .search input, .filters select { font-size: 16px; }
+  .filters select { min-width: 0; width: 100%; }
+  .live { margin-left: auto; }
   .layout { grid-template-columns: 1fr; }
-  aside { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
-  .card { min-width: 200px; }
+  aside {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .card { min-width: 0; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .filters { padding: 12px 14px; }
+  .filters label { flex: 1 1 140px; min-width: 0; max-width: none; }
+  .note { padding: 12px 14px 0; }
+  .tokenhead, .tlist { padding-left: 14px; padding-right: 14px; }
+  .closecall, .more, .unwatch { width: 40px; height: 40px; }
+  .filters .unwatch-all { flex: 1 1 auto; }
+}
+@media (max-width: 640px) {
+  .snips { grid-template-columns: 1fr; }
+  #watchView tbody tr { grid-template-columns: 1fr 1fr; }
+  .trow {
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 6px 10px;
+  }
+  .trow > .capbig, .trow > .alertwhen { grid-column: 2; }
+  .trow > .capbig { font-size: 16px; }
+  .trow > .alertwhen { white-space: normal; }
+  .stat .v { font-size: 18px; }
+  .tokenhead { align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tokenhead .unwatch-all { flex: 1 1 100%; margin-left: 0; text-align: center; }
+  .filters .unwatch-all { flex: 1 1 100%; }
+}
+@media (max-width: 380px) {
+  .brand h1 { font-size: 18px; }
+  aside { grid-template-columns: 1fr 1fr; }
+  .stats { grid-template-columns: 1fr; padding: 12px; }
+  .stat .v { font-size: 20px; }
 }
 </style>
 </head>
@@ -236,17 +374,18 @@ button.sym { background: none; border: 0; padding: 0; cursor: pointer; text-alig
             <option value="age">Сначала новые</option>
             <option value="age_old">Сначала старые</option>
             <option value="theses">По числу тезисов</option>
-            <option value="cap">По капе</option>
-            <option value="vol">По объёму</option>
+            <option value="vol5m">По объёму за 5 мин</option>
+            <option value="vol1h">По объёму за 1 час</option>
           </select>
         </label>
+        <button type="button" class="unwatch-all" id="unwatchAll">Снять все</button>
       </div>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
-              <th>Токен</th><th>Тир</th><th>Капа</th><th>Объём</th><th>Ликвидность</th>
-              <th>В наблюдении</th><th>В тире ещё</th><th>Тезисы</th><th>Опрос</th>
+              <th>Токен</th><th>Тир</th><th>Объём</th>
+              <th>В наблюдении</th><th>В тире ещё</th><th>Тезисы</th><th>Опрос</th><th></th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
@@ -270,7 +409,8 @@ button.sym { background: none; border: 0; padding: 0; cursor: pointer; text-alig
             <option value="new">Сначала новые</option>
             <option value="old">Сначала старые</option>
             <option value="theses">По числу тезисов</option>
-            <option value="cap">По капе</option>
+            <option value="vol5m">По объёму за 5 мин</option>
+            <option value="vol1h">По объёму за 1 час</option>
           </select>
         </label>
       </div>
@@ -280,7 +420,7 @@ button.sym { background: none; border: 0; padding: 0; cursor: pointer; text-alig
             <tr>
               <th>Токен</th>
               <th>Тезисы · 3 последних</th>
-              <th>Капа</th>
+              <th>Объём</th>
               <th>Алерт</th>
               <th></th>
             </tr>
@@ -339,6 +479,7 @@ let tokenId = "";
 let tokenKind = "";
 let tokenDetail = null;
 const gone = new Set();
+const released = new Set();
 let fetchedAt = 0;
 let seq = 0;
 let poll = 0;
@@ -423,10 +564,11 @@ function renderTiers() {
   const cur = selectedTier();
   const items = [
     { view: "feed", tier: 0, name: "Лента", meta: "отправленные алерты", n: feedCount(), cls: "feed" },
-    { view: "watch", tier: 0, name: "Все тиры", meta: "сейчас в наблюдении", n: (data && data.watching) || 0, cls: "" }
+    { view: "watch", tier: 0, name: "Все тиры", meta: "сейчас в наблюдении", n: liveTokens().length, cls: "" }
   ];
   for (const t of (data && data.tiers) || []) {
-    items.push({ view: "watch", tier: t.tier, name: "Тир " + t.tier, meta: "длится " + dur(t.lasts_ms) + " · " + every(t.every_ms), n: t.tokens, cls: "t" + t.tier });
+    const n = liveTokens().filter(tok => tok.tier === t.tier).length;
+    items.push({ view: "watch", tier: t.tier, name: "Тир " + t.tier, meta: "длится " + dur(t.lasts_ms) + " · " + every(t.every_ms), n, cls: "t" + t.tier });
   }
   if (box.childElementCount !== items.length) {
     const left = box.scrollLeft;
@@ -490,11 +632,22 @@ function applyView() {
   if (view === "token") renderHits();
 }
 
+function liveTokens() {
+  return ((data && data.tokens) || []).filter(t => !released.has(t.mint));
+}
+function tabTokens() {
+  const tier = selectedTier();
+  return liveTokens().filter(t => !tier || t.tier === tier);
+}
+function pruneReleased() {
+  const have = new Set(((data && data.tokens) || []).map(t => t.mint));
+  for (const mint of released) if (!have.has(mint)) released.delete(mint);
+}
 function shown() {
   if (!data) return [];
   const tier = selectedTier();
   const q = document.getElementById("q").value.trim().toLowerCase();
-  let rows = (data.tokens || []).filter(t => {
+  let rows = liveTokens().filter(t => {
     if (tier && t.tier !== tier) return false;
     if (!q) return true;
     return [t.symbol, t.name, t.mint, t.dex, t.deployer].join(" ").toLowerCase().includes(q);
@@ -505,14 +658,15 @@ function shown() {
     age: (a, b) => age(a) - age(b),
     age_old: (a, b) => age(b) - age(a),
     theses: (a, b) => (b.theses - a.theses) || (age(a) - age(b)),
-    cap: (a, b) => ((b.market_cap || 0) - (a.market_cap || 0)) || (age(a) - age(b)),
-    vol: (a, b) => ((b.volume_usd || 0) - (a.volume_usd || 0)) || (age(a) - age(b))
+    vol5m: (a, b) => ((b.volume_5m || 0) - (a.volume_5m || 0)) || (age(a) - age(b)),
+    vol1h: (a, b) => ((b.volume_1h || 0) - (a.volume_1h || 0)) || (age(a) - age(b))
   }[sort] || ((a, b) => age(a) - age(b));
   rows.sort(key);
   return rows;
 }
 
 function renderRows() {
+  syncUnwatchAll();
   if (!data) return;
   const body = document.getElementById("rows");
   const empty = document.getElementById("empty");
@@ -545,15 +699,9 @@ function paint(tr, t) {
   theses.textContent = t.checked ? (t.theses + " / " + (data.need || 0)) : "—";
   theses.title = t.checked ? "" : "ещё не спрашивали";
   tr.querySelector("[data-every]").textContent = every(t.every_ms);
-  const cap = tr.querySelector("[data-cap]");
-  cap.textContent = usd(t.market_cap);
-  cap.title = t.entry_market_cap ? "на входе " + usd(t.entry_market_cap) : "";
   const vol = tr.querySelector("[data-vol]");
-  vol.textContent = usd(t.volume_usd);
-  vol.title = [t.entry_volume_usd ? "на входе " + usd(t.entry_volume_usd) : "", "объём за 24 ч"].filter(Boolean).join(" · ");
-  const liq = tr.querySelector("[data-liq]");
-  liq.textContent = usd(t.liquidity_usd);
-  liq.title = t.entry_liquidity_usd ? "на входе " + usd(t.entry_liquidity_usd) : "";
+  fillVolume(vol, t);
+  vol.title = volumeTitle(t, "замер " + ago(t.volume_at), t.entry_volume_5m);
   fillAvatar(tr.querySelector(".av"), t);
   const who = tr.querySelector(".who");
   let fail = who.querySelector(".fail");
@@ -615,19 +763,73 @@ function row(t) {
   }
   paintSlow(text, t.fomo_ms);
   td.append(av, text);
-  const capCell = cell(usd(t.market_cap));
-  capCell.dataset.cap = "1";
-  capCell.title = t.entry_market_cap ? "на входе " + usd(t.entry_market_cap) : "";
-  const volCell = cell(usd(t.volume_usd));
+  const volCell = cell("");
   volCell.dataset.vol = "1";
-  volCell.title = [t.entry_volume_usd ? "на входе " + usd(t.entry_volume_usd) : "", "объём за 24 ч"].filter(Boolean).join(" · ");
-  const liqCell = cell(usd(t.liquidity_usd));
-  liqCell.dataset.liq = "1";
-  liqCell.title = t.entry_liquidity_usd ? "на входе " + usd(t.entry_liquidity_usd) : "";
+  fillVolume(volCell, t);
+  volCell.title = volumeTitle(t, "замер " + ago(t.volume_at), t.entry_volume_5m);
   const everyCell = cell(every(t.every_ms));
   everyCell.dataset.every = "1";
-  tr.append(td, cellTier(t), capCell, volCell, liqCell, tickCell("up", t.age_ms), tickCell("down", t.left_ms), cellTheses(t), everyCell);
+  tr.append(td, cellTier(t), volCell, tickCell("up", t.age_ms), tickCell("down", t.left_ms), cellTheses(t), everyCell, unwatchCell(t.mint));
   return tr;
+}
+function unwatchCell(mint) {
+  const td = document.createElement("td");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "unwatch";
+  btn.title = "Снять с наблюдения";
+  btn.setAttribute("aria-label", "Снять с наблюдения");
+  btn.textContent = "×";
+  btn.addEventListener("click", () => unwatch(mint));
+  td.append(btn);
+  return td;
+}
+function syncUnwatchAll() {
+  const btn = document.getElementById("unwatchAll");
+  if (!btn) return;
+  const tier = selectedTier();
+  const q = document.getElementById("q").value.trim();
+  const n = (q ? shown() : tabTokens()).length;
+  btn.textContent = q ? "Снять найденные" : (tier ? "Снять тир" : "Снять все");
+  btn.disabled = n === 0;
+  btn.title = n ? ("Снять " + n + " с наблюдения. Опросы остановятся.") : "Нечего снимать";
+}
+function unwatch(mint) {
+  if (!mint || released.has(mint)) return;
+  released.add(mint);
+  renderTiers();
+  renderRows();
+  if (view === "token" && tokenKind === "watch" && tokenId === mint) pickTier(selectedTier());
+  fetch("/api/watch/" + encodeURIComponent(mint) + "/release", { method: "POST" }).then(res => {
+    if (res.ok || res.status === 404) return;
+    throw new Error(String(res.status));
+  }).catch(() => {
+    released.delete(mint);
+    load();
+  });
+}
+function unwatchTab() {
+  const q = document.getElementById("q").value.trim();
+  const rows = q ? shown() : tabTokens();
+  if (!rows.length) return;
+  const tier = selectedTier();
+  const what = q ? ("найденные (" + rows.length + ")") : (tier ? ("тир " + tier + " (" + rows.length + ")") : ("все токены (" + rows.length + ")"));
+  if (!confirm("Снять с наблюдения " + what + "? Опросы fomo и объёма по ним остановятся.")) return;
+  const mints = rows.map(t => t.mint);
+  for (const mint of mints) released.add(mint);
+  renderTiers();
+  renderRows();
+  if (view === "token" && tokenKind === "watch" && released.has(tokenId)) pickTier(selectedTier());
+  fetch("/api/watch/release", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mints })
+  }).then(res => {
+    if (!res.ok) throw new Error(String(res.status));
+  }).catch(() => {
+    for (const mint of mints) released.delete(mint);
+    load();
+  });
 }
 function fillAvatar(av, t) {
   placeImage(av, t.symbol, t.image_url);
@@ -671,17 +873,17 @@ function tick() {
 function renderNote() {
   if (view === "token") {
     document.getElementById("note").textContent = tokenKind === "watch"
-      ? "Тезисы — последний опрос fomo. Капа, объём и ликвидность — DexScreener: снимок на входе и последнее обновление."
+      ? "Тезисы — последний опрос fomo. Объём — покупки и продажи пары на Axiom за 1 час и за 5 минут; по 5-минутному идёт фильтр."
       : "Тезисы, сохранённые с колом. Порядок — по возрасту или по размеру позиции.";
     return;
   }
   if (view === "feed") {
-    document.getElementById("note").textContent = "Три последних тезиса и капа — на момент кола. Крестик или смахивание влево убирает его из ленты, страница с текстами остаётся.";
+    document.getElementById("note").textContent = "Три последних тезиса и объём пары за 1 час и 5 минут — на момент кола. Крестик или смахивание влево убирает его из ленты, страница с текстами остаётся.";
     return;
   }
   const n = data && data.need;
   document.getElementById("note").textContent = n
-    ? "Алерт уходит, когда тезисов становится " + n + ". Капа, объём и ликвидность обновляются с DexScreener, пока токен в тирах 1–3. Наведите на цифру — снимок на входе."
+    ? "Алерт уходит, когда тезисов становится " + n + ". Объём пары на Axiom за 1 час и за 5 минут обновляется, пока токен в тирах 1–3; фильтр идёт по 5 минутам. Наведите на цифру — сделки, время замера и объём на входе. Крестик снимает токен: опросы fomo и объёма по нему останавливаются."
     : "";
 }
 function rangeMs() { return ranges[document.getElementById("range").value] || 0; }
@@ -711,7 +913,8 @@ function shownFeed() {
     new: (a, b) => at(b) - at(a),
     old: (a, b) => at(a) - at(b),
     theses: (a, b) => (b.theses - a.theses) || (at(b) - at(a)),
-    cap: (a, b) => (b.market_cap - a.market_cap) || (at(b) - at(a))
+    vol5m: (a, b) => ((b.volume_5m || 0) - (a.volume_5m || 0)) || (at(b) - at(a)),
+    vol1h: (a, b) => ((b.volume_1h || 0) - (a.volume_1h || 0)) || (at(b) - at(a))
   }[document.getElementById("feedSort").value] || ((a, b) => at(b) - at(a));
   rows.sort(key);
   return rows;
@@ -770,9 +973,9 @@ function paintFeed(tr, a) {
   const agoEl = tr.querySelector("[data-ago].alertago");
   agoEl.dataset.ago = a.at || "";
   agoEl.textContent = ago(a.at);
-  const cap = tr.querySelector("[data-cap]");
-  cap.textContent = usd(a.market_cap);
-  cap.title = a.market_cap ? "капа в момент алерта" : "";
+  const vol = tr.querySelector("[data-vol]");
+  fillVolume(vol, a);
+  vol.title = volumeTitle(a, "на момент алерта");
   fillSnips(tr.querySelector(".snips"), a.snippets || []);
 }
 const dotColors = ["var(--green)", "var(--cyan)", "var(--violet)"];
@@ -820,7 +1023,7 @@ function feedRow(a) {
   sheet.className = "sheet";
   const grid = document.createElement("div");
   grid.className = "callgrid";
-  grid.append(tokenCell(a), thesisCell(a), capCell(a), whenCell(a), moreCell(a));
+  grid.append(tokenCell(a), thesisCell(a), volCell(a), whenCell(a), moreCell(a));
   sheet.append(grid);
   td.append(under, sheet);
   tr.append(td);
@@ -952,12 +1155,12 @@ function thesisCell(a) {
   td.append(box);
   return td;
 }
-function capCell(a) {
+function volCell(a) {
   const td = document.createElement("div");
   td.className = "capbig";
-  td.dataset.cap = "1";
-  td.textContent = usd(a.market_cap);
-  if (a.market_cap) td.title = "капа в момент алерта";
+  td.dataset.vol = "1";
+  fillVolume(td, a);
+  td.title = volumeTitle(a, "на момент алерта");
   return td;
 }
 function whenCell(a) {
@@ -1138,6 +1341,14 @@ function renderToken() {
   const extra = tokenFacts(d);
   if (extra) text.append(extra);
   head.append(av, text);
+  if (d.live && d.mint) {
+    const drop = document.createElement("button");
+    drop.type = "button";
+    drop.className = "unwatch-all";
+    drop.textContent = "Снять с наблюдения";
+    drop.addEventListener("click", () => unwatch(d.mint));
+    head.append(drop);
+  }
 
   const stats = document.getElementById("tokenStats");
   stats.replaceChildren();
@@ -1148,9 +1359,8 @@ function renderToken() {
   if (d.live) {
     const asked = d.checked_at || "";
     stats.append(
-      stat("Капа", usd(d.market_cap), entryLine(d.entry_market_cap, d.quote_at)),
-      stat("Объём", usd(d.volume_usd), entryLine(d.entry_volume_usd, "") || "за 24 ч"),
-      stat("Ликвидность", usd(d.liquidity_usd), [d.liquidity_sol ? "старт " + sol(d.liquidity_sol) : "", d.entry_liquidity_usd ? "на входе " + usd(d.entry_liquidity_usd) : ""].filter(Boolean).join(" · ") || "dexscreener"),
+      stat("Объём", volumeNode(d), entryLine(d.entry_volume_5m, d.volume_at)),
+      ...(d.liquidity_sol ? [stat("Ликвидность", sol(d.liquidity_sol), "на старте")] : []),
       stat("Тезисов", (d.count || 0) + " / " + (d.need || 0), theses.length && d.count > theses.length ? "в списке " + theses.length : (d.checked ? "с последнего опроса" : "ещё не спрашивали")),
       stat("Последний опрос", asked ? clock(asked) : "—", asked ? ago(asked) : ""),
       stat("Создан", d.created_at ? clock(d.created_at) : "—", d.created_at ? ago(d.created_at) : ""),
@@ -1158,7 +1368,7 @@ function renderToken() {
     );
   } else {
     stats.append(
-      stat("Капа", usd(d.market_cap), "на момент кола"),
+      stat("Объём", volumeNode(d), d.volume_at ? "на момент кола" : ""),
       stat("Тезисов", d.count ? String(d.count) : String(theses.length), theses.length && d.count && theses.length < d.count ? "в списке " + theses.length : "на fomo"),
       stat("Первый раз", first ? clock(first) : "—", first ? ago(first) : ""),
       stat("Последний тезис", last ? clock(last) : "—", last ? ago(last) : "")
@@ -1180,9 +1390,35 @@ function renderToken() {
 }
 function entryLine(entry, at) {
   const bits = [];
-  if (entry) bits.push("на входе " + usd(entry));
-  if (at) bits.push("обновлено " + ago(at));
+  if (entry) bits.push("5м на входе " + usd(entry));
+  if (at) bits.push("замер " + ago(at));
   return bits.join(" · ");
+}
+function volUsd(v) { return v ? usd(v) : "$0"; }
+// fillVolume shows "5м $X 1ч $Y". Without volume_at there was no sample, and
+// a zero after a sample is real: nobody traded in that window.
+function fillVolume(el, t) {
+  el.replaceChildren();
+  if (!t.volume_at) { el.textContent = "—"; return; }
+  for (const [win, v] of [["5м", t.volume_5m], ["1ч", t.volume_1h]]) {
+    const s = document.createElement("span");
+    s.className = "vol";
+    const w = document.createElement("i");
+    w.textContent = win;
+    s.append(w, volUsd(v));
+    el.append(s);
+  }
+}
+function volumeNode(t) {
+  const el = document.createElement("span");
+  fillVolume(el, t);
+  return el;
+}
+function volumeTitle(t, when, entry5m) {
+  if (!t.volume_at) return "объём ещё не замеряли";
+  const bits = ["сделок: 5м " + (t.trades_5m || 0) + " · 1ч " + (t.trades_1h || 0), when];
+  if (entry5m) bits.push("5м на входе " + usd(entry5m));
+  return bits.join("\n");
 }
 function sol(v) {
   if (!v) return "";
@@ -1214,7 +1450,7 @@ function stat(k, v, s) {
   const el = document.createElement("div");
   el.className = "stat";
   const kk = document.createElement("div"); kk.className = "k"; kk.textContent = k;
-  const vv = document.createElement("div"); vv.className = "v"; vv.textContent = v;
+  const vv = document.createElement("div"); vv.className = "v"; vv.append(v);
   const ss = document.createElement("div"); ss.className = "s"; ss.textContent = s || "";
   el.append(kk, vv, ss);
   return el;
@@ -1283,6 +1519,7 @@ async function load() {
     }
     if (feedRes.ok) feed = await feedRes.json();
     data = await res.json();
+    pruneReleased();
     fetchedAt = Date.now();
     const when = new Date(data.as_of).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     setLive(true, "на связи · " + when);
@@ -1290,6 +1527,7 @@ async function load() {
     renderNote();
     renderTiers();
     renderRows();
+    syncUnwatchAll();
     renderFeed();
     if (view === "token" && tokenKind === "watch" && tokenId) refreshWatch(tokenId);
   } catch (e) {
@@ -1307,6 +1545,7 @@ function start() {
   tickTimer = setInterval(tick, 1000);
 }
 document.getElementById("tier").addEventListener("change", () => { view = "watch"; applyView(); renderTiers(); renderRows(); });
+document.getElementById("unwatchAll").addEventListener("click", unwatchTab);
 document.getElementById("sort").addEventListener("change", renderRows);
 document.getElementById("q").addEventListener("input", () => { renderRows(); renderFeed(); renderHits(); });
 document.getElementById("backFeed").addEventListener("click", () => { if (tokenKind === "watch") pickTier(selectedTier()); else pickFeed(); });

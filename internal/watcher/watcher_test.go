@@ -102,6 +102,32 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
+func TestReleasedTokenIsNotAskedAgain(t *testing.T) {
+	f := &fakeFomo{counts: map[string]int{"M": 1}}
+	st, _ := store.Open("")
+	w := New(testConfig(), []Account{{Name: "a", Client: f}}, nil, st, quiet())
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: time.Now()})
+	it := w.items["M"]
+	if _, err := w.check(context.Background(), 0, it); err != nil {
+		t.Fatal(err)
+	}
+	if f.calls.Load() != 1 {
+		t.Fatalf("calls %d", f.calls.Load())
+	}
+	if !w.Release("M") {
+		t.Fatal("release")
+	}
+	if _, err := w.check(context.Background(), 0, it); err != nil {
+		t.Fatal(err)
+	}
+	if f.calls.Load() != 1 {
+		t.Fatalf("request after release: %d", f.calls.Load())
+	}
+	if len(w.VolumeTokens()) != 0 || w.queue.Len() != 0 {
+		t.Fatalf("still queued: volume %d queue %d", len(w.VolumeTokens()), w.queue.Len())
+	}
+}
+
 func TestReleaseDropsATokenWaitingForTheNextCheck(t *testing.T) {
 	st, _ := store.Open("")
 	w := New(testConfig(), nil, nil, st, quiet())

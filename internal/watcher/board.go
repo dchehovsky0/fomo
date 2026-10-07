@@ -54,21 +54,17 @@ type BoardToken struct {
 	FomoURL  string `json:"fomo_url,omitempty"`
 	AxiomURL string `json:"axiom_url,omitempty"`
 	ImageURL string `json:"image_url,omitempty"`
-	// Market numbers. market_cap, volume_usd and liquidity_usd are the latest
-	// DexScreener sample. entry_* is the sample that let the token in.
-	MarketCap         float64   `json:"market_cap,omitempty"`
-	VolumeUSD         float64   `json:"volume_usd,omitempty"`
-	LiquidityUSD      float64   `json:"liquidity_usd,omitempty"`
-	EntryMarketCap    float64   `json:"entry_market_cap,omitempty"`
-	EntryVolumeUSD    float64   `json:"entry_volume_usd,omitempty"`
-	EntryLiquidityUSD float64   `json:"entry_liquidity_usd,omitempty"`
-	QuoteAt           time.Time `json:"quote_at,omitzero"`
-	Deployer          string    `json:"deployer,omitempty"`
-	LiquiditySOL      float64   `json:"liquidity_sol,omitempty"`
-	Website           string    `json:"website,omitempty"`
-	Twitter           string    `json:"twitter,omitempty"`
-	Telegram          string    `json:"telegram,omitempty"`
-	Discord           string    `json:"discord,omitempty"`
+	// Pair volume from Axiom's 5-minute and 1-hour windows, sampled at
+	// volume_at. entry_volume_5m is the sample that let the token in.
+	domain.Volume
+	EntryVolume5m float64   `json:"entry_volume_5m,omitempty"`
+	VolumeAt      time.Time `json:"volume_at,omitzero"`
+	Deployer      string    `json:"deployer,omitempty"`
+	LiquiditySOL  float64   `json:"liquidity_sol,omitempty"`
+	Website       string    `json:"website,omitempty"`
+	Twitter       string    `json:"twitter,omitempty"`
+	Telegram      string    `json:"telegram,omitempty"`
+	Discord       string    `json:"discord,omitempty"`
 }
 
 // seenThesis is one thesis from the last successful poll.
@@ -182,11 +178,10 @@ func (w *Watcher) Board() Board {
 			Mint: it.l.Mint, Symbol: it.l.Symbol, Name: it.l.Name, Dex: it.l.Dex, Pool: it.l.Pool,
 			Tier: tier, AgeMS: age.Milliseconds(), LeftMS: left.Milliseconds(), EveryMS: every.Milliseconds(),
 			Theses: it.count, Checked: it.checks > 0, Checks: it.checks, NextMS: next, FailKind: it.failKind,
-			FomoMS:    it.fomoMS,
-			ImageURL:  pickImage(it),
-			MarketCap: it.marketCap, VolumeUSD: it.volumeUSD, LiquidityUSD: it.liquidityUSD,
-			EntryMarketCap: it.l.EntryMarketCap, EntryVolumeUSD: it.l.EntryVolumeUSD, EntryLiquidityUSD: it.l.EntryLiquidityUSD,
-			QuoteAt: it.quoteAt, Deployer: it.l.Deployer, LiquiditySOL: it.l.LiquiditySOL,
+			FomoMS:   it.fomoMS,
+			ImageURL: pickImage(it),
+			Volume:   it.volume, EntryVolume5m: it.l.EntryVolume.USD5m,
+			VolumeAt: it.volumeAt, Deployer: it.l.Deployer, LiquiditySOL: it.l.LiquiditySOL,
 			Website: it.l.Website, Twitter: it.l.Twitter, Telegram: it.l.Telegram, Discord: it.l.Discord,
 		})
 		if tier >= 1 && tier <= len(b.Tiers) {
@@ -242,39 +237,35 @@ func (w *Watcher) BoardHandler(fomoTpl, axiomTpl string) http.Handler {
 }
 
 // LiveToken is one watched token opened from the board. Theses are the last
-// fomo answer. Market cap, volume and liquidity are the latest DexScreener
-// sample, with the entry snapshot kept beside them.
+// fomo answer. Volume is the pair's last Axiom sample, with the 5-minute
+// volume that let the token in kept beside it.
 type LiveToken struct {
-	Mint              string       `json:"mint"`
-	Symbol            string       `json:"symbol"`
-	Name              string       `json:"name"`
-	Chain             string       `json:"chain,omitempty"`
-	Dex               string       `json:"dex,omitempty"`
-	Tier              int          `json:"tier"`
-	ImageURL          string       `json:"image_url,omitempty"`
-	Count             int          `json:"count"`
-	Need              int          `json:"need"`
-	Checked           bool         `json:"checked"`
-	CheckedAt         time.Time    `json:"checked_at,omitzero"`
-	FomoMS            int64        `json:"fomo_ms,omitempty"`
-	CreatedAt         time.Time    `json:"created_at,omitzero"`
-	FomoURL           string       `json:"fomo_url,omitempty"`
-	AxiomURL          string       `json:"axiom_url,omitempty"`
-	Live              bool         `json:"live"`
-	Theses            []LiveThesis `json:"theses"`
-	MarketCap         float64      `json:"market_cap,omitempty"`
-	VolumeUSD         float64      `json:"volume_usd,omitempty"`
-	LiquidityUSD      float64      `json:"liquidity_usd,omitempty"`
-	EntryMarketCap    float64      `json:"entry_market_cap,omitempty"`
-	EntryVolumeUSD    float64      `json:"entry_volume_usd,omitempty"`
-	EntryLiquidityUSD float64      `json:"entry_liquidity_usd,omitempty"`
-	QuoteAt           time.Time    `json:"quote_at,omitzero"`
-	Deployer          string       `json:"deployer,omitempty"`
-	LiquiditySOL      float64      `json:"liquidity_sol,omitempty"`
-	Website           string       `json:"website,omitempty"`
-	Twitter           string       `json:"twitter,omitempty"`
-	Telegram          string       `json:"telegram,omitempty"`
-	Discord           string       `json:"discord,omitempty"`
+	Mint      string       `json:"mint"`
+	Symbol    string       `json:"symbol"`
+	Name      string       `json:"name"`
+	Chain     string       `json:"chain,omitempty"`
+	Dex       string       `json:"dex,omitempty"`
+	Tier      int          `json:"tier"`
+	ImageURL  string       `json:"image_url,omitempty"`
+	Count     int          `json:"count"`
+	Need      int          `json:"need"`
+	Checked   bool         `json:"checked"`
+	CheckedAt time.Time    `json:"checked_at,omitzero"`
+	FomoMS    int64        `json:"fomo_ms,omitempty"`
+	CreatedAt time.Time    `json:"created_at,omitzero"`
+	FomoURL   string       `json:"fomo_url,omitempty"`
+	AxiomURL  string       `json:"axiom_url,omitempty"`
+	Live      bool         `json:"live"`
+	Theses    []LiveThesis `json:"theses"`
+	domain.Volume
+	EntryVolume5m float64   `json:"entry_volume_5m,omitempty"`
+	VolumeAt      time.Time `json:"volume_at,omitzero"`
+	Deployer      string    `json:"deployer,omitempty"`
+	LiquiditySOL  float64   `json:"liquidity_sol,omitempty"`
+	Website       string    `json:"website,omitempty"`
+	Twitter       string    `json:"twitter,omitempty"`
+	Telegram      string    `json:"telegram,omitempty"`
+	Discord       string    `json:"discord,omitempty"`
 }
 
 // LiveThesis is one thesis from the last poll.
@@ -317,11 +308,88 @@ func (w *Watcher) Live(mint, fomoTpl, axiomTpl string) (LiveToken, bool) {
 		Checked: it.checks > 0, CheckedAt: it.seenAt, FomoMS: it.fomoMS, CreatedAt: it.l.CreatedAt,
 		FomoURL: linkTemplate(fomoTpl, it.l.Mint, ""), AxiomURL: linkTemplate(axiomTpl, it.l.Mint, it.l.Pool),
 		Live: true, Theses: theses,
-		MarketCap: it.marketCap, VolumeUSD: it.volumeUSD, LiquidityUSD: it.liquidityUSD,
-		EntryMarketCap: it.l.EntryMarketCap, EntryVolumeUSD: it.l.EntryVolumeUSD, EntryLiquidityUSD: it.l.EntryLiquidityUSD,
-		QuoteAt: it.quoteAt, Deployer: it.l.Deployer, LiquiditySOL: it.l.LiquiditySOL,
+		Volume: it.volume, EntryVolume5m: it.l.EntryVolume.USD5m,
+		VolumeAt: it.volumeAt, Deployer: it.l.Deployer, LiquiditySOL: it.l.LiquiditySOL,
 		Website: it.l.Website, Twitter: it.l.Twitter, Telegram: it.l.Telegram, Discord: it.l.Discord,
 	}, true
+}
+
+// releaseBody lists mints to take off the watch list.
+type releaseBody struct {
+	Mints []string `json:"mints"`
+}
+
+// ReleaseHandler takes one mint, or a list of them, off the watch list.
+// POST /api/watch/{mint}/release removes that mint. POST /api/watch/release
+// with {"mints":[...]} removes each one still being watched. Fomo checks and
+// pair-volume rechecks stop; a request already on the wire can finish, and
+// it is not followed by another. A mint that is not watched is skipped.
+// The list call answers {"released": n}. The single call answers 204, or 404
+// when that mint is not on the board.
+func (w *Watcher) ReleaseHandler() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if mint := strings.TrimSpace(r.PathValue("mint")); mint != "" {
+			if !validMint(mint) {
+				http.Error(rw, "mint", http.StatusBadRequest)
+				return
+			}
+			if w.ReleaseMints([]string{mint}) == 0 {
+				http.NotFound(rw, r)
+				return
+			}
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
+		var body releaseBody
+		dec := json.NewDecoder(http.MaxBytesReader(rw, r.Body, 1<<20))
+		if err := dec.Decode(&body); err != nil {
+			http.Error(rw, "mints", http.StatusBadRequest)
+			return
+		}
+		if len(body.Mints) == 0 || len(body.Mints) > 5000 {
+			http.Error(rw, "mints", http.StatusBadRequest)
+			return
+		}
+		mints := make([]string, 0, len(body.Mints))
+		for _, mint := range body.Mints {
+			mint = strings.TrimSpace(mint)
+			if !validMint(mint) {
+				http.Error(rw, "mint", http.StatusBadRequest)
+				return
+			}
+			mints = append(mints, mint)
+		}
+		n := w.ReleaseMints(mints)
+		out, err := json.Marshal(struct {
+			Released int `json:"released"`
+		}{Released: n})
+		if err != nil {
+			http.Error(rw, "release", http.StatusInternalServerError)
+			return
+		}
+		h := rw.Header()
+		h.Set("Content-Type", "application/json; charset=utf-8")
+		h.Set("Cache-Control", "no-store")
+		h.Set("X-Content-Type-Options", "nosniff")
+		rw.Write(out)
+	})
+}
+
+// validMint is a Solana address: base58, short enough to be a mint.
+func validMint(mint string) bool {
+	if mint == "" || len(mint) > 64 {
+		return false
+	}
+	for _, r := range mint {
+		switch {
+		case r >= '1' && r <= '9':
+		case r >= 'A' && r <= 'H', r >= 'J' && r <= 'N', r >= 'P' && r <= 'Z':
+		case r >= 'a' && r <= 'k', r >= 'm' && r <= 'z':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // LiveHandler serves Live as JSON. A mint that is not being watched is 404.

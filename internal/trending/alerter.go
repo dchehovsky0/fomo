@@ -156,7 +156,7 @@ func (a *Alerter) alert(ctx context.Context, j job) {
 	t := j.tok
 	alert := notify.Alert{
 		Kind: notify.KindTrending, Rank: t.Rank, Returned: j.returned,
-		Token: t.Mint, Symbol: t.Symbol, Name: t.Name, ImageURL: t.ImageURL, MarketCap: t.MarketCap,
+		Token: t.Mint, Symbol: t.Symbol, Name: t.Name, ImageURL: t.ImageURL,
 		DetectedAt: j.at,
 	}
 	a.log.Info("flow", "step", "fomo", "status", "запрос", "where", "trending",

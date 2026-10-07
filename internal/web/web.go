@@ -200,6 +200,7 @@ type view struct {
 	Recent     string
 	Window     string
 	Zone       string
+	VolumeNote string
 }
 
 // Since is how long after the token launch t was, empty when unknown.
@@ -248,6 +249,12 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	if !a.CreatedAt.IsZero() {
 		v.Age = notify.HumanDuration(a.DetectedAt.Sub(a.CreatedAt))
+	}
+	if !a.VolumeAt.IsZero() {
+		v.VolumeNote = "на момент алерта"
+		if age := a.DetectedAt.Sub(a.VolumeAt); age > 2*time.Minute {
+			v.VolumeNote = "замер за " + notify.HumanDuration(age) + " до алерта"
+		}
 	}
 	var body bytes.Buffer
 	if err := s.tmpl.Execute(&body, v); err != nil {

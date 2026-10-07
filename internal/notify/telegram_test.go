@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"fomobot/internal/domain"
 )
 
 func quietNotify() *slog.Logger {
@@ -47,7 +49,7 @@ func thesisAlert() Alert {
 	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
 	return Alert{
 		Kind: KindTheses, Token: "MINT", Symbol: "ELON", Name: "Elon", Dex: "Pump AMM",
-		DetectedAt: now, Count: 7, MarketCap: 46_000,
+		DetectedAt: now, Count: 7, Volume: domain.Volume{USD5m: 1200, USD1h: 46_000}, VolumeAt: now,
 		First: []Thesis{{At: now, Handle: "a", Text: "текст"}},
 	}
 }

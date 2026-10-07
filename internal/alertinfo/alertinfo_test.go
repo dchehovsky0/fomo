@@ -2,7 +2,6 @@ package alertinfo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"fomobot/internal/dexscreener"
+	"fomobot/internal/domain"
 	"fomobot/internal/fomo"
 	"fomobot/internal/launches"
 	"fomobot/internal/notify"
@@ -52,19 +51,12 @@ func theses(n int, step time.Duration) []fomo.Thesis {
 	return out
 }
 
-type fakePairs struct {
-	pairs []dexscreener.Pair
-	err   error
-}
-
-func (p fakePairs) Pairs(context.Context, string) ([]dexscreener.Pair, error) { return p.pairs, p.err }
-
-func builder(checkers []Checker, pairs PairSource, lookup LaunchLookup) *Builder {
+func builder(checkers []Checker, lookup LaunchLookup) *Builder {
 	b := New(Config{
 		FirstN: 3, RateWindow: 10 * time.Minute, NetworkID: fomo.SolanaNetworkID,
 		FomoLinkTemplate:  "https://fomo.family/tokens/solana/{mint}",
 		AxiomLinkTemplate: "https://axiom.trade/meme/{pair}?chain=sol",
-	}, checkers, pairs, lookup, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}, checkers, lookup, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	b.now = func() time.Time { return now }
 	return b
 }
@@ -84,7 +76,7 @@ func TestCompleteHintNeedsNoRequests(t *testing.T) {
 	lookup := func(string) (launches.Launch, bool) {
 		return launches.Launch{CreatedAt: now.Add(-time.Hour), Dex: "pumpfun", Pool: "CURVE"}, true
 	}
-	a := builder([]Checker{f}, nil, lookup).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, hint)
+	a := builder([]Checker{f}, lookup).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, hint)
 
 	if f.calls.Load() != 0 {
 		t.Errorf("requests = %d, want 0", f.calls.Load())
@@ -96,7 +88,7 @@ func TestCompleteHintNeedsNoRequests(t *testing.T) {
 	if !a.RateKnown || a.Recent != 3 || a.RecentCapped || a.Count != 4 {
 		t.Errorf("rate: known=%v recent=%d capped=%v count=%d", a.RateKnown, a.Recent, a.RecentCapped, a.Count)
 	}
-	if a.Chain != "Solana" || a.Dex != "pumpfun" || a.CreatedAt.IsZero() || a.MarketCap != 4000 {
+	if a.Chain != "Solana" || a.Dex != "pumpfun" || a.CreatedAt.IsZero() {
 		t.Errorf("alert = %+v", a)
 	}
 	if got := positions(a.Latest); len(got) != 3 || got[0] != 2 || got[1] != 3 || got[2] != 4 {
@@ -113,7 +105,7 @@ func TestCompleteHintNeedsNoRequests(t *testing.T) {
 func TestCountLagDoesNotShrinkTheAlert(t *testing.T) {
 	f := &fakeFomo{}
 	hint := &fomo.TokenThesisPage{Count: 2, Items: theses(3, time.Minute)}
-	a := builder([]Checker{f}, nil, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, hint)
+	a := builder([]Checker{f}, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, hint)
 	if f.calls.Load() != 0 {
 		t.Errorf("requests = %d, want 0", f.calls.Load())
 	}
@@ -124,7 +116,7 @@ func TestCountLagDoesNotShrinkTheAlert(t *testing.T) {
 
 func TestBigTokenFindsFirstTheses(t *testing.T) {
 	f := &fakeFomo{all: theses(5000, 20*time.Second)} // ~28 hours, 30 theses per 10 min
-	a := builder([]Checker{f, f}, nil, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, nil)
+	a := builder([]Checker{f, f}, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, nil)
 
 	if got := positions(a.First); len(got) != 3 || got[0] != 1 || got[1] != 2 || got[2] != 3 || !a.FirstExact {
 		t.Fatalf("first = %v exact=%v", got, a.FirstExact)
@@ -152,7 +144,7 @@ func (d *deadAccount) SortedThesis(context.Context, string, time.Time, time.Time
 
 func TestDeadAccountIsSkipped(t *testing.T) {
 	dead, f := &deadAccount{}, &fakeFomo{all: theses(4, time.Minute)}
-	a := builder([]Checker{dead, f}, nil, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, nil)
+	a := builder([]Checker{dead, f}, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, nil)
 	if len(a.First) != 3 || !a.FirstExact || dead.calls.Load() == 0 {
 		t.Errorf("first=%d exact=%v dead calls=%d", len(a.First), a.FirstExact, dead.calls.Load())
 	}
@@ -160,79 +152,24 @@ func TestDeadAccountIsSkipped(t *testing.T) {
 
 func TestRateIsCapped(t *testing.T) {
 	f := &fakeFomo{all: theses(3000, 100*time.Millisecond)}
-	a := builder([]Checker{f}, nil, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, nil)
+	a := builder([]Checker{f}, nil).Complete(context.Background(), notify.Alert{Token: "MINT", DetectedAt: now}, nil)
 	if a.Recent != 500 || !a.RecentCapped {
 		t.Errorf("recent=%d capped=%v", a.Recent, a.RecentCapped)
 	}
 }
 
-func TestMarketFromDexScreener(t *testing.T) {
-	pairs := fakePairs{pairs: []dexscreener.Pair{
-		{PairAddress: "CURVE", LiquidityUSD: 10, MarketCap: 1, TokenName: "Cat", TokenSymbol: "CAT"},
-		{PairAddress: "POOL", LiquidityUSD: 90_000, MarketCap: 2_500_000},
-	}}
-	a := builder(nil, pairs, nil).Complete(context.Background(), notify.Alert{Token: "MINT"}, nil)
-	if a.AxiomURL != "https://axiom.trade/meme/POOL?chain=sol" || a.MarketCap != 2_500_000 || a.Name != "Cat" || a.Symbol != "CAT" {
-		t.Errorf("alert = %+v", a)
+func TestAxiomLinkUsesLaunchPool(t *testing.T) {
+	lookup := func(string) (launches.Launch, bool) {
+		return launches.Launch{Pool: "POOL"}, true
+	}
+	vol := domain.Volume{USD5m: 7, USD1h: 70}
+	a := builder(nil, lookup).Complete(context.Background(), notify.Alert{Token: "MINT", Volume: vol, Symbol: "WS"}, nil)
+	if a.AxiomURL != "https://axiom.trade/meme/POOL?chain=sol" || a.Volume != vol || a.Symbol != "WS" {
+		t.Fatalf("alert = %+v", a)
 	}
 
-	a = builder(nil, pairs, nil).Complete(context.Background(), notify.Alert{Token: "MINT", MarketCap: 7, Symbol: "WS"}, nil)
-	if a.MarketCap != 7 || a.Symbol != "WS" {
-		t.Errorf("stream values must win: %+v", a)
-	}
-
-	a = builder(nil, fakePairs{err: errors.New("down")}, nil).Complete(context.Background(), notify.Alert{Token: "MINT"}, nil)
+	a = builder(nil, nil).Complete(context.Background(), notify.Alert{Token: "MINT"}, nil)
 	if a.AxiomURL != "https://axiom.trade/meme/MINT?chain=sol" {
-		t.Errorf("fallback link = %s", a.AxiomURL)
-	}
-}
-
-type seqPairs struct {
-	calls int
-	seq   [][]dexscreener.Pair
-}
-
-func (s *seqPairs) Pairs(context.Context, string) ([]dexscreener.Pair, error) {
-	i := s.calls
-	s.calls++
-	if i >= len(s.seq) {
-		return s.seq[len(s.seq)-1], nil
-	}
-	return s.seq[i], nil
-}
-
-func TestPumpAMMPollsUntilCap(t *testing.T) {
-	src := &seqPairs{seq: [][]dexscreener.Pair{
-		nil,
-		{{PairAddress: "CURVE", MarketCap: 0}},
-		{{PairAddress: "AMM", MarketCap: 50_000, LiquidityUSD: 1000}},
-	}}
-	b := builder(nil, src, nil)
-	b.pumpEvery = time.Millisecond
-	a := b.Complete(context.Background(), notify.Alert{Token: "MINT", Dex: "Pump AMM"}, nil)
-	if src.calls != 3 || a.MarketCap != 50_000 || a.AxiomURL != "https://axiom.trade/meme/AMM?chain=sol" {
-		t.Fatalf("calls=%d alert=%+v", src.calls, a)
-	}
-
-	ready := &seqPairs{seq: [][]dexscreener.Pair{
-		{{PairAddress: "AMM", MarketCap: 50_000}},
-		{{PairAddress: "LATER", MarketCap: 99_000}},
-	}}
-	b = builder(nil, ready, nil)
-	b.pumpEvery = time.Millisecond
-	a = b.Complete(context.Background(), notify.Alert{Token: "MINT", Dex: "Pump AMM"}, nil)
-	if ready.calls != 1 || a.MarketCap != 50_000 {
-		t.Fatalf("a cap on the first answer must not be asked again: calls=%d mc=%v", ready.calls, a.MarketCap)
-	}
-
-	other := &seqPairs{seq: [][]dexscreener.Pair{
-		nil,
-		{{PairAddress: "LATER", MarketCap: 9}},
-	}}
-	b = builder(nil, other, nil)
-	b.pumpEvery = time.Millisecond
-	a = b.Complete(context.Background(), notify.Alert{Token: "MINT", Dex: "Pump V1"}, nil)
-	if other.calls != 1 || a.MarketCap != 0 {
-		t.Fatalf("other dex calls=%d mc=%v", other.calls, a.MarketCap)
+		t.Fatalf("fallback link = %s", a.AxiomURL)
 	}
 }

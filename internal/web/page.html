@@ -48,6 +48,8 @@ body {
 .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
 .stat .v { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .stat .s { font-size: 12px; color: var(--muted); }
+.stat .vol { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 18px; }
+.stat .vol i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); margin-right: 4px; }
 .ca {
   display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 10px 10px 10px 14px; margin-bottom: 26px;
@@ -96,11 +98,33 @@ h2 .hint { font-size: 12px; font-weight: 500; color: var(--amber); }
   padding: 13px 10px; border-radius: 14px; background: var(--card2); border: 1px solid var(--line);
 }
 .btn.primary { background: linear-gradient(135deg, var(--accent), #5b8cff); border-color: transparent; color: #fff; }
-@media (max-width: 420px) {
+.hero > div, .head, .who { min-width: 0; }
+.pill { max-width: 100%; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
   .stats { grid-template-columns: 1fr 1fr; }
   .stats .stat:last-child { grid-column: span 2; }
+  .stat .v { font-size: 20px; }
   .hero h1 { font-size: 24px; }
-  .logo { width: 60px; height: 60px; border-radius: 16px; }
+}
+@media (max-width: 420px) {
+  .wrap {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  .bar {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  .logo { width: 56px; height: 56px; border-radius: 16px; font-size: 22px; }
+  .hero { gap: 12px; }
+  .hero h1 { font-size: 22px; }
+  .ca { flex-direction: column; align-items: stretch; padding: 12px; }
+  button.copy { width: 100%; }
+  .head { align-items: flex-start; }
+  .bar .in { gap: 8px; }
+  .btn { font-size: 14px; padding: 12px 8px; }
+  .stat { padding: 12px; }
+  .text { font-size: 15px; }
 }
 </style>
 </head>
@@ -122,7 +146,7 @@ h2 .hint { font-size: 12px; font-weight: 500; color: var(--amber); }
   </section>
 
   <section class="stats">
-    <div class="stat"><div class="k">Market cap</div><div class="v">{{if .A.MarketCap}}{{compact .A.MarketCap}}{{else}}—{{end}}</div><div class="s">на момент алерта</div></div>
+    <div class="stat"><div class="k">Объём</div>{{if .A.VolumeAt.IsZero}}<div class="v">—</div>{{else}}<div class="v vol"><span><i>1ч</i>{{compact .A.Volume.USD1h}}</span><span><i>5м</i>{{compact .A.Volume.USD5m}}</span></div><div class="s">{{.VolumeNote}}</div>{{end}}</div>
     <div class="stat"><div class="k">Тезисов / мин</div><div class="v">{{if .A.RateKnown}}{{.Rate}}{{else}}—{{end}}</div><div class="s">{{if .A.RateKnown}}{{.Recent}} за {{.Window}}{{end}}</div></div>
     <div class="stat"><div class="k">Всего тезисов</div><div class="v">{{if .A.CountKnown}}{{group .A.Count}}{{else}}—{{end}}</div><div class="s">на fomo</div></div>
   </section>
@@ -157,7 +181,6 @@ h2 .hint { font-size: 12px; font-weight: 500; color: var(--amber); }
 <nav class="bar"><div class="in">
   {{if .A.FomoURL}}<a class="btn primary" href="{{.A.FomoURL}}" target="_blank" rel="noopener">fomo</a>{{end}}
   {{if .A.AxiomURL}}<a class="btn" href="{{.A.AxiomURL}}" target="_blank" rel="noopener">Axiom</a>{{end}}
-  <a class="btn" href="https://dexscreener.com/solana/{{.A.Token}}" target="_blank" rel="noopener">DexScreener</a>
 </div></nav>
 
 <script>

@@ -303,7 +303,7 @@ flowchart LR
   Авторы:
   • prometheusx91 — $27,982 (verified)
   • ...
-  https://fomo.family/tokens/solana/MINT | https://dexscreener.com/solana/MINT
+  https://fomo.family/tokens/solana/MINT | https://axiom.trade/meme/PAIR
   ```
 - Адрес в `<code>`, чтобы копировался в один тап.
 - Ретраи при 429 от Telegram (`retry_after`).
