@@ -219,6 +219,8 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 		}, st, notifier, log.With("component", "trending"))
 	}
 
+	src.OnMigrate = func(l domain.Token) { adoptMigration(w, gate, l) }
+
 	protocols := "all"
 	if len(cfg.Axiom.Protocols) > 0 {
 		protocols = strings.Join(cfg.Axiom.Protocols, ",")
@@ -296,7 +298,7 @@ func reportStats(ctx context.Context, src *launches.Source, ax *axiom.Stream, w 
 			"requests", requests, "avg_http", avgDuration(httpNanos, httpSamples),
 			"http_429", limited, "auth_errors", authErrs, "signaled_tokens", st.Signals())
 		log.Info("axiom stats",
-			"protocols", src.Protocols(), "duplicates", ss.Duplicates.Load(), "filtered", ss.Filtered.Load(),
+			"protocols", src.Protocols(), "duplicates", ss.Duplicates.Load(), "migrated", ss.Migrated.Load(), "filtered", ss.Filtered.Load(),
 			"connects", as.Connects.Load(), "chrome_restarts", as.Restarts.Load(), "bad_messages", as.Bad.Load(),
 			"dropped", as.Dropped.Load())
 		if stream != nil {
@@ -799,6 +801,42 @@ func newStatsPage(cfg config.Config, log *slog.Logger) (*axiom.StatsPage, error)
 		},
 		StartTimeout: a.StartTimeout,
 	}, log.With("component", "axiom"))
+}
+
+// adoptMigration follows a Pump V1 mint onto its Pump AMM pair.
+// A token still watched keeps its fomo checks; the frozen curve volume
+// cannot take it off the list. A token already dropped for that volume
+// comes back. A token that never cleared the curve is screened on the new pair.
+func adoptMigration(w *watcher.Watcher, gate *screen.Gate, l domain.Token) {
+	if gate != nil {
+		gate.NoteMigration(l)
+	}
+	// Remember the pair before any return. A volume read already in flight
+	// still names the curve and is rewritten onto this pair when it lands.
+	if w.NoteMigration(l) {
+		if gate != nil {
+			gate.ResetStreak(l.Mint)
+		}
+		return
+	}
+	if gate != nil && gate.RetargetPending(l) {
+		return
+	}
+	if w.Dismissed(l.Mint) {
+		return
+	}
+	if w.ReopenDropped(l.Mint) {
+		w.Add(l)
+		if gate != nil {
+			gate.ResetStreak(l.Mint)
+		}
+		return
+	}
+	if gate != nil {
+		gate.ScreenPair(l)
+		return
+	}
+	w.Add(l)
 }
 
 func newScreen(cfg config.Config, stats *axiom.StatsPage, log *slog.Logger) (*screen.Gate, error) {

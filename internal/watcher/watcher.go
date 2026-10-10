@@ -1,5 +1,7 @@
-// Package watcher checks young tokens on fomo until they reach the thesis
-// threshold or grow older than the lifetime. Checks are spread over several
+// Package watcher checks young tokens on fomo for the whole watch.
+// The first alert goes out at MinTheses. The token stays on the list, and
+// the next alerts go out each time that count doubles. Volume and age
+// rules do not change when an alert is sent. Checks are spread over several
 // fomo accounts, each with its own client and rate limit.
 package watcher
 
@@ -9,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"slices"
 	"strings"
@@ -40,17 +43,20 @@ type Notifier interface {
 
 type Store interface {
 	IsSignaled(token string) bool
+	Signal(token string) (store.Signal, bool)
 	MarkSignaled(sig store.Signal) error
 }
 
 // TierBook stores the current tier of a watched token and each time it changed.
 // EnterTier writes tier 1, or returns the row already stored for this mint.
 // AdvanceTier appends a later tier. SetWatchStatus does not touch the tier
-// or its history.
+// or its history. WatchStatus is empty and ok is false when the mint was
+// never stored.
 type TierBook interface {
 	EnterTier(ctx context.Context, tok domain.Token, enteredAt time.Time) (tier int, entered time.Time, status string, inserted bool, err error)
 	AdvanceTier(ctx context.Context, mint string, tier int, at time.Time) error
 	SetWatchStatus(ctx context.Context, mint, status string, at time.Time) error
+	WatchStatus(ctx context.Context, mint string) (status string, ok bool, err error)
 }
 
 // Tier: tokens younger than MaxAge are checked every Every.
@@ -63,7 +69,9 @@ type Config struct {
 	Lifetime time.Duration
 	// VolumeFor: pair volume is checked only while the token has been
 	// in tier 1 for less than this. Zero means the whole lifetime.
-	VolumeFor   time.Duration
+	VolumeFor time.Duration
+	// MinTheses is the first alert. The token stays watched; later alerts
+	// go out at twice, four times, eight times this count.
 	MinTheses   int
 	ThesisLimit int
 	Schedule    []Tier
@@ -90,11 +98,14 @@ type Stats struct {
 }
 
 type item struct {
-	l            domain.Token
-	due          time.Time
-	idx          int
-	checks       int
-	count        int
+	l      domain.Token
+	due    time.Time
+	idx    int
+	checks int
+	count  int
+	// notified is the last rung we sent: 0, then MinTheses, then double that.
+	// The next alert waits for twice this value.
+	notified     int
 	gone         bool
 	addedAt      time.Time
 	tierMu       sync.Mutex
@@ -144,14 +155,20 @@ type Watcher struct {
 	gap   time.Duration
 	phase int
 
-	mu     sync.Mutex
-	items  map[string]*item
-	queue  itemHeap
-	lagSum time.Duration
-	lagN   int
-	lagMax time.Duration
-	wake   chan struct{}
-	delays []Delay
+	mu    sync.Mutex
+	items map[string]*item
+	// migrated is the Pump AMM pair for a mint that left its bonding curve.
+	// An admission still in flight carries the curve and is rewritten from here.
+	migrated map[string]domain.Token
+	// dismissed is a mint taken off the board by hand. A later migration
+	// does not put it back. A volume drop is not in this set.
+	dismissed map[string]struct{}
+	queue     itemHeap
+	lagSum    time.Duration
+	lagN      int
+	lagMax    time.Duration
+	wake      chan struct{}
+	delays    []Delay
 }
 
 func New(cfg Config, accounts []Account, n Notifier, st Store, log *slog.Logger) *Watcher {
@@ -169,7 +186,8 @@ func New(cfg Config, accounts []Account, n Notifier, st Store, log *slog.Logger)
 		cfg: cfg, accounts: accounts, notifier: n, store: st, log: log, now: time.Now,
 		perAcc: make([]atomic.Int64, len(accounts)),
 		gap:    queueGap(cfg.Schedule),
-		items:  map[string]*item{}, wake: make(chan struct{}, 1),
+		items:  map[string]*item{}, migrated: map[string]domain.Token{},
+		dismissed: map[string]struct{}{}, wake: make(chan struct{}, 1),
 	}
 }
 
@@ -191,15 +209,15 @@ func queueGap(schedule []Tier) time.Duration {
 // The tier clock starts here, when the token enters tier 1, not at creation.
 func (w *Watcher) Add(l domain.Token) {
 	now := w.now()
-	if w.store.IsSignaled(l.Mint) {
-		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "алерт по этому токену уже был",
-			"token", l.Mint, "ticker", l.Symbol)
+	w.mu.Lock()
+	l = w.withMigration(l)
+	if w.keepWatching(l) {
+		w.mu.Unlock()
 		return
 	}
-	w.mu.Lock()
-	if _, ok := w.items[l.Mint]; ok {
+	if _, off := w.dismissed[l.Mint]; off {
 		w.mu.Unlock()
-		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "уже следим за этим токеном",
+		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "токен убрали с доски",
 			"token", l.Mint, "ticker", l.Symbol)
 		return
 	}
@@ -207,6 +225,9 @@ func (w *Watcher) Add(l domain.Token) {
 	it := &item{
 		l: l, due: now, addedAt: now,
 		volume: l.EntryVolume,
+	}
+	if sig, ok := w.store.Signal(l.Mint); ok {
+		it.notified = rungReached(w.cfg.MinTheses, sig)
 	}
 	if l.EntryVolume != (domain.Volume{}) {
 		it.volumeAt = now
@@ -217,9 +238,15 @@ func (w *Watcher) Add(l domain.Token) {
 		return
 	}
 	w.mu.Lock()
-	if _, ok := w.items[l.Mint]; ok {
+	l = w.withMigration(l)
+	it.l.Dex, it.l.Pool = l.Dex, l.Pool
+	if w.keepWatching(l) {
 		w.mu.Unlock()
-		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "уже следим за этим токеном",
+		return
+	}
+	if _, off := w.dismissed[l.Mint]; off {
+		w.mu.Unlock()
+		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "токен убрали с доски",
 			"token", l.Mint, "ticker", l.Symbol)
 		return
 	}
@@ -260,11 +287,23 @@ func (w *Watcher) Tokens() []domain.Token {
 }
 
 // Release stops watching mint. A check already in flight is not turned into
-// another one, and a later launch of the same mint is not taken again.
+// another one. A later launch of the same mint is not taken again, except a
+// Pump V1 mint that graduates to Pump AMM.
 func (w *Watcher) Release(mint string) bool {
+	return w.release(mint, "", "dropped")
+}
+
+// ReleasePair stops watching mint only while its volume is still read from
+// pool. A sample from the bonding curve arrives after the pair has moved to
+// Pump AMM and must leave the token on the list.
+func (w *Watcher) ReleasePair(mint, pool string) bool {
+	return w.release(mint, pool, "dropped")
+}
+
+func (w *Watcher) release(mint, pool, status string) bool {
 	w.mu.Lock()
 	it, ok := w.items[mint]
-	if !ok {
+	if !ok || (pool != "" && it.l.Pool != pool) {
 		w.mu.Unlock()
 		return false
 	}
@@ -275,8 +314,115 @@ func (w *Watcher) Release(mint string) bool {
 	}
 	w.mu.Unlock()
 	// A token dropped for low volume, or taken off the board, does not move
-	// to the next tier and is not watched again.
-	w.markStatus(mint, "dropped", w.now())
+	// to the next tier and is not watched again. Status tells those apart:
+	// a volume drop can return on Pump AMM, a hand removal cannot.
+	w.markStatus(mint, status, w.now())
+	return true
+}
+
+// withMigration rewrites a launch onto the stored Pump AMM pair.
+// w.mu must be held.
+func (w *Watcher) withMigration(l domain.Token) domain.Token {
+	next, ok := w.migrated[l.Mint]
+	if !ok || next.Pool == "" {
+		return l
+	}
+	l.Dex = next.Dex
+	l.Pool = next.Pool
+	return l
+}
+
+// keepWatching reports that mint is already on the list. A stored migration
+// moves the pair first, so an admission that still carries the curve does
+// not leave the watch on it. w.mu must be held.
+func (w *Watcher) keepWatching(l domain.Token) bool {
+	it := w.items[l.Mint]
+	if it == nil || it.gone {
+		return false
+	}
+	if it.l.Pool != l.Pool || it.l.Dex != l.Dex {
+		old := it.l.Pool
+		it.l.Dex = l.Dex
+		it.l.Pool = l.Pool
+		w.log.Info("flow", "step", "миграция", "decision", "пара заменена",
+			"why", "pump v1 перешёл на pump amm",
+			"token", l.Mint, "ticker", it.l.Symbol, "pair", l.Pool, "old_pair", old)
+		return true
+	}
+	w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "уже следим за этим токеном",
+		"token", l.Mint, "ticker", l.Symbol)
+	return true
+}
+
+// NoteMigration remembers the Pump AMM pair and points a token that is still
+// watched at it. False means the mint is not on the list right now; an
+// admission already in flight still picks the pair up.
+func (w *Watcher) NoteMigration(l domain.Token) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.migrated[l.Mint] = l
+	it := w.items[l.Mint]
+	if it == nil || it.gone {
+		return false
+	}
+	old := it.l.Pool
+	it.l.Dex = l.Dex
+	it.l.Pool = l.Pool
+	w.log.Info("flow", "step", "миграция", "decision", "пара заменена",
+		"why", "pump v1 перешёл на pump amm",
+		"token", l.Mint, "ticker", it.l.Symbol, "pair", l.Pool, "old_pair", old)
+	return true
+}
+
+// Dismissed reports a mint taken off the board by hand.
+func (w *Watcher) Dismissed(mint string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, ok := w.dismissed[mint]
+	return ok
+}
+
+// dismiss takes a mint off the board and keeps a later Pump AMM migration
+// from putting it back. A volume drop does not call this.
+func (w *Watcher) dismiss(mint string) bool {
+	w.mu.Lock()
+	_, watching := w.items[mint]
+	if watching {
+		w.dismissed[mint] = struct{}{}
+	}
+	w.mu.Unlock()
+	if !watching {
+		return false
+	}
+	return w.release(mint, "", "removed")
+}
+
+// Retarget points a token that is still watched at a new pair and remembers
+// it, so a volume check still in flight cannot put the curve back.
+// The tier clock and the fomo checks stay. False means the mint is not on the list.
+func (w *Watcher) Retarget(l domain.Token) bool {
+	return w.NoteMigration(l)
+}
+
+// ReopenDropped marks a mint that left on volume as watched again, so Add
+// can take it. Alerted and expired rows stay as they are. False means there
+// is nothing to reopen.
+func (w *Watcher) ReopenDropped(mint string) bool {
+	if w.tiers == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	status, ok, err := w.tiers.WatchStatus(ctx, mint)
+	if err != nil || !ok || status != "dropped" {
+		return false
+	}
+	if err := w.tiers.SetWatchStatus(ctx, mint, "watching", w.now()); err != nil {
+		w.log.Warn("watch tier status", "token", mint, "status", "watching", "err", err)
+		return false
+	}
+	w.log.Info("flow", "step", "миграция", "decision", "вернули в наблюдение",
+		"why", "сняли по старой паре, пришла pump amm", "token", mint)
 	return true
 }
 
@@ -296,7 +442,7 @@ func (w *Watcher) ReleaseMints(mints []string) int {
 			symbol = it.l.Symbol
 		}
 		w.mu.Unlock()
-		if w.Release(mint) {
+		if w.dismiss(mint) {
 			n++
 			w.log.Info("flow", "step", "наблюдение", "decision", "снят", "why", "убрали с доски",
 				"token", mint, "ticker", symbol)
@@ -520,37 +666,62 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	// under mu, and the log below runs after that write.
 	w.publishPage(it, page, seen)
 
-	if seenN >= w.cfg.MinTheses {
+	if rung := nextRung(w.notifiedOf(it), w.cfg.MinTheses); rung > 0 && seenN >= rung {
 		if w.finished(it) {
 			return 0, nil
 		}
 		w.logCheck(acc, it, took, lag, "threshold", seenN, 0, nil, page)
-		w.signal(ctx, it, page, finished, it.due, started, seen, took)
-		return 0, nil
+		if w.signal(ctx, it, page, finished, it.due, started, seen, took) {
+			return 0, nil
+		}
 	}
+	w.follow(acc, it, now, finished, seen, took, lag, seenN, page)
+	return 0, nil
+}
+
+// follow puts the token back on the queue. Volume, tier and lifetime stay
+// the same after an alert as they were before it. A token past its lifetime
+// leaves here.
+func (w *Watcher) follow(acc int, it *item, now, finished, seen time.Time, took, lag time.Duration, seenN int, page *fomo.TokenThesisPage) {
+	if w.finished(it) {
+		return
+	}
+	w.mu.Lock()
 	it.sawBelow = true
 	it.belowAt = seen
 	it.belowCount = seenN
+	notified := it.notified
+	w.mu.Unlock()
 	w.clearMiss(it)
 	every := w.interval(w.inWork(it, finished))
-	next := nextDue(now, finished, every)
+	// A slow send must not make the next poll already due. The tier interval
+	// is counted from when this check actually finishes.
+	asOf := w.now()
+	if finished.After(asOf) {
+		asOf = finished
+	}
+	next := nextDue(now, asOf, every)
+	end := w.workEnd(it)
 	if w.cfg.Lifetime > 0 && next.After(end) {
-		if !end.After(finished) {
+		if !end.After(asOf) {
 			w.Stats.Expired.Add(1)
 			w.drop(it)
-			w.noteTier(it, finished)
-			w.markStatus(it.l.Mint, "expired", finished)
+			w.noteTier(it, asOf)
+			w.markStatus(it.l.Mint, "expired", asOf)
 			w.logCheck(acc, it, took, lag, "expired", seenN, 0, nil, page)
-			return 0, nil
+			return
 		}
 		next = end // one last look right at the end of the lifetime
 	}
 	it.scheduledDue = next
-	it.every = next.Sub(finished)
-	w.logCheck(acc, it, took, lag, "below", seenN, next.Sub(finished), nil, page)
+	it.every = next.Sub(asOf)
+	result := "below"
+	if w.cfg.MinTheses > 0 && notified >= w.cfg.MinTheses {
+		result = "hold"
+	}
+	w.logCheck(acc, it, took, lag, result, seenN, next.Sub(asOf), nil, page)
 	w.noteTier(it, finished)
 	w.reschedule(it, next)
-	return 0, nil
 }
 
 // nextDue is one poll period after the check started. A check that already
@@ -572,6 +743,8 @@ func (w *Watcher) logCheck(acc int, it *item, took, lag time.Duration, result st
 	switch result {
 	case "below":
 		why = "тезисов меньше порога"
+	case "hold":
+		alert, why = "уже отправлен", "ждём следующее удвоение"
 	case "threshold":
 		alert, why = "собираем", "тезисов достаточно"
 	case "expired":
@@ -586,7 +759,7 @@ func (w *Watcher) logCheck(acc int, it *item, took, lag time.Duration, result st
 	args := []any{
 		"step", "fomo", "status", "ответ", "alert", alert, "why", why,
 		"account", w.accounts[acc].Name, "token", it.l.Mint, "ticker", it.l.Symbol,
-		"count", count, "need", w.cfg.MinTheses, "checks", it.checks,
+		"count", count, "need", w.nextNeed(it), "checks", it.checks,
 		"took", took.Round(time.Millisecond), "lag", lag.Round(time.Millisecond),
 		"token_age", w.now().Sub(it.l.CreatedAt).Round(time.Second),
 	}
@@ -735,7 +908,10 @@ func later(a, b time.Time) time.Time {
 	return b
 }
 
-func (w *Watcher) signal(ctx context.Context, it *item, page *fomo.TokenThesisPage, now, due, started, seen time.Time, fomoTook time.Duration) {
+// signal sends every rung this answer crossed. False means the token is still
+// watched and the caller should schedule the next check. True means this
+// function already rescheduled it, or the token has left the list.
+func (w *Watcher) signal(ctx context.Context, it *item, page *fomo.TokenThesisPage, now, due, started, seen time.Time, fomoTook time.Duration) bool {
 	ticker := ""
 	for _, t := range page.Items {
 		if t.Ticker != "" {
@@ -747,48 +923,120 @@ func (w *Watcher) signal(ctx context.Context, it *item, page *fomo.TokenThesisPa
 		ticker = it.l.Symbol
 	}
 	n := page.Observed()
-	rec := store.Signal{Token: it.l.Mint, Ticker: ticker, Count: n, SentAt: now}
 	w.mu.Lock()
 	vol, volAt := it.volume, it.volumeAt
 	w.mu.Unlock()
 
-	alert := notify.Alert{
-		Kind: notify.KindTheses, Threshold: w.cfg.MinTheses, Token: it.l.Mint, Symbol: ticker, Name: it.l.Name,
-		CreatedAt: it.l.CreatedAt, Dex: it.l.Dex, DetectedAt: now, CountKnown: true, Count: n,
-		Volume: vol, VolumeAt: volAt, Tier: w.tierNumber(w.inWork(it, now)), FomoMS: nonNegMS(fomoTook),
+	for {
+		rung := nextRung(w.notifiedOf(it), w.cfg.MinTheses)
+		if rung == 0 || n < rung {
+			break
+		}
+		if w.finished(it) {
+			return true
+		}
+		doubled := w.notifiedOf(it) >= w.cfg.MinTheses
+		alert := notify.Alert{
+			Kind: notify.KindTheses, Threshold: rung, Doubled: doubled, Token: it.l.Mint, Symbol: ticker, Name: it.l.Name,
+			CreatedAt: it.l.CreatedAt, Dex: it.l.Dex, DetectedAt: now, CountKnown: true, Count: n,
+			Volume: vol, VolumeAt: volAt, Tier: w.tierNumber(w.inWork(it, now)), FomoMS: nonNegMS(fomoTook),
+		}
+		asmStart := time.Now()
+		if w.cfg.Complete != nil {
+			alert = w.cfg.Complete(ctx, alert, page)
+		}
+		assembled := time.Since(asmStart)
+		sendStart := time.Now()
+		if err := w.notifier.Send(ctx, alert); err != nil {
+			w.Stats.SendErrors.Add(1)
+			w.log.Error("flow", "step", "алерт", "alert", "не отправлен", "why", "отправка не удалась, повторим",
+				"where", "theses", "token", it.l.Mint, "ticker", alert.Symbol, "count", n, "need", rung,
+				"assembled", assembled.Round(time.Millisecond), "send", time.Since(sendStart).Round(time.Millisecond), "err", err)
+			w.miss(it, "send", started, later(w.now(), started.Add(w.cfg.RetryDelay)))
+			w.noteTier(it, now)
+			w.reschedule(it, w.now().Add(w.cfg.RetryDelay))
+			return true
+		}
+		sentAt := time.Now()
+		sent := sentAt.Sub(sendStart)
+		w.setNotified(it, rung)
+		rec := store.Signal{Token: it.l.Mint, Ticker: ticker, Count: n, Threshold: rung, SentAt: now}
+		if err := w.store.MarkSignaled(rec); err != nil {
+			w.log.Error("save signal", "token", it.l.Mint, "err", err)
+		}
+		w.Stats.Signals.Add(1)
+		d := w.delay(it, page, due, started, seen, sentAt, fomoTook, assembled, sent, rung)
+		where := "theses"
+		if doubled {
+			where = "x2"
+		}
+		w.log.Info("flow", "step", "алерт", "alert", "отправлен", "where", where,
+			"token", it.l.Mint, "ticker", alert.Symbol, "count", n, "need", rung,
+			"token_age", now.Sub(it.l.CreatedAt).Round(time.Second), "checks", it.checks,
+			"assembled", assembled.Round(time.Millisecond), "send", sent.Round(time.Millisecond),
+			"took", time.Since(asmStart).Round(time.Millisecond), "why", d.Why)
+		w.remember(d)
 	}
-	asmStart := time.Now()
-	if w.cfg.Complete != nil {
-		alert = w.cfg.Complete(ctx, alert, page)
+	return w.finished(it)
+}
+
+// nextNeed is the thesis count that sends the next alert.
+func (w *Watcher) nextNeed(it *item) int {
+	return alertNeed(w.notifiedOf(it), w.cfg.MinTheses)
+}
+
+// alertNeed is the next rung, or min when the count can no longer double.
+func alertNeed(notified, min int) int {
+	if need := nextRung(notified, min); need > 0 {
+		return need
 	}
-	assembled := time.Since(asmStart)
-	sendStart := time.Now()
-	if err := w.notifier.Send(ctx, alert); err != nil {
-		w.Stats.SendErrors.Add(1)
-		w.log.Error("flow", "step", "алерт", "alert", "не отправлен", "why", "отправка не удалась, повторим",
-			"where", "theses", "token", it.l.Mint, "ticker", alert.Symbol, "count", n,
-			"assembled", assembled.Round(time.Millisecond), "send", time.Since(sendStart).Round(time.Millisecond), "err", err)
-		w.miss(it, "send", started, later(time.Now(), started.Add(w.cfg.RetryDelay)))
-		w.noteTier(it, now)
-		w.reschedule(it, now.Add(w.cfg.RetryDelay))
-		return
+	if min > 0 {
+		return min
 	}
-	sentAt := time.Now()
-	sent := sentAt.Sub(sendStart)
-	if err := w.store.MarkSignaled(rec); err != nil {
-		w.log.Error("save signal", "token", it.l.Mint, "err", err)
+	return 1
+}
+
+func (w *Watcher) notifiedOf(it *item) int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return it.notified
+}
+
+func (w *Watcher) setNotified(it *item, n int) {
+	w.mu.Lock()
+	it.notified = n
+	w.mu.Unlock()
+}
+
+// nextRung is the next alert after notified. Zero notified means the first
+// alert, at min. After that the rung doubles. Zero means there is no further rung.
+func nextRung(notified, min int) int {
+	if min < 1 {
+		min = 1
 	}
-	w.Stats.Signals.Add(1)
-	d := w.delay(it, page, due, started, seen, sentAt, fomoTook, assembled, sent)
-	w.log.Info("flow", "step", "алерт", "alert", "отправлен", "where", "theses",
-		"token", it.l.Mint, "ticker", alert.Symbol, "count", n,
-		"token_age", now.Sub(it.l.CreatedAt).Round(time.Second), "checks", it.checks,
-		"assembled", assembled.Round(time.Millisecond), "send", sent.Round(time.Millisecond),
-		"took", time.Since(asmStart).Round(time.Millisecond), "why", d.Why)
-	w.remember(d)
-	w.drop(it)
-	w.noteTier(it, now)
-	w.markStatus(it.l.Mint, "alerted", sentAt)
+	if notified < min {
+		return min
+	}
+	if notified > math.MaxInt/2 {
+		return 0
+	}
+	return notified * 2
+}
+
+// rungReached is the highest rung already sent. A stored threshold wins.
+// Older rows only have the observed count.
+func rungReached(min int, sig store.Signal) int {
+	if min < 1 {
+		min = 1
+	}
+	if sig.Threshold >= min {
+		return sig.Threshold
+	}
+	rung := 0
+	for next := min; next > 0 && sig.Count >= next; next = nextRung(next, min) {
+		rung = next
+	}
+	return rung
 }
 
 // Snapshot is the state of the watcher for periodic logs.
@@ -960,9 +1208,9 @@ type Delay struct {
 	failSpans []span
 }
 
-func (w *Watcher) delay(it *item, page *fomo.TokenThesisPage, due, started, seen, sent time.Time, fomoTook, assembled, send time.Duration) Delay {
+func (w *Watcher) delay(it *item, page *fomo.TokenThesisPage, due, started, seen, sent time.Time, fomoTook, assembled, send time.Duration, threshold int) Delay {
 	d := Delay{
-		Token: it.l.Mint, Symbol: it.l.Symbol, Threshold: w.cfg.MinTheses,
+		Token: it.l.Mint, Symbol: it.l.Symbol, Threshold: threshold,
 		AddedAt: it.addedAt, DueAt: due, StartedAt: started, SeenAt: seen, SentAt: sent,
 		Fails: it.fails, FailKind: it.failKind, failSpans: it.failSpans,
 		FomoMS: nonNegMS(fomoTook), AssembleMS: nonNegMS(assembled), SendMS: nonNegMS(send),
@@ -976,7 +1224,7 @@ func (w *Watcher) delay(it *item, page *fomo.TokenThesisPage, due, started, seen
 			}
 		}
 	}
-	if at, ok := thresholdThesisAt(page, w.cfg.MinTheses); ok {
+	if at, ok := thresholdThesisAt(page, threshold); ok {
 		d.ThesisAt = at
 	}
 	if it.sawBelow {

@@ -22,14 +22,15 @@ type Feed struct {
 // FeedItem is one sent alert. Volume is the pair's last Axiom sample when the
 // alert was assembled, taken at VolumeAt. PageURL is the theses page on this server.
 type FeedItem struct {
-	ID     string    `json:"id"`
-	At     time.Time `json:"at"`
-	Kind   string    `json:"kind"`
-	Mint   string    `json:"mint"`
-	Symbol string    `json:"symbol"`
-	Name   string    `json:"name"`
-	Dex    string    `json:"dex,omitempty"`
-	Theses int       `json:"theses"`
+	ID      string    `json:"id"`
+	At      time.Time `json:"at"`
+	Kind    string    `json:"kind"`
+	Doubled bool      `json:"doubled,omitempty"`
+	Mint    string    `json:"mint"`
+	Symbol  string    `json:"symbol"`
+	Name    string    `json:"name"`
+	Dex     string    `json:"dex,omitempty"`
+	Theses  int       `json:"theses"`
 	domain.Volume
 	VolumeAt time.Time    `json:"volume_at,omitzero"`
 	PageURL  string       `json:"page_url"`
@@ -129,7 +130,7 @@ func (s *Server) readAlert(id string) (FeedItem, bool) {
 		return FeedItem{}, false
 	}
 	return FeedItem{
-		ID: id, At: at, Kind: a.Kind, Mint: a.Token, Symbol: a.Symbol, Name: a.Name, Dex: a.Dex,
+		ID: id, At: at, Kind: a.Kind, Doubled: a.Doubled, Mint: a.Token, Symbol: a.Symbol, Name: a.Name, Dex: a.Dex,
 		Theses: a.Count, Volume: a.Volume, VolumeAt: a.VolumeAt, PageURL: "/t/" + id,
 		FomoURL: a.FomoURL, AxiomURL: a.AxiomURL, Chain: a.Chain, Tier: a.Tier, ImageURL: alertImage(a),
 		FomoMS: a.FomoMS, Snippets: feedSnippets(a),

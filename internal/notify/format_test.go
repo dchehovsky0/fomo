@@ -54,6 +54,27 @@ func TestFormat(t *testing.T) {
 	}
 }
 
+func TestFormatDoubled(t *testing.T) {
+	a := sample()
+	a.Doubled = true
+	a.Threshold = 12
+	a.Count = 14
+	got := Format(a, msk)
+	for _, want := range []string{
+		"⚡️ <b>X2 TRENDING · 12 тезисов</b>",
+		"<b>$PRI&lt;ORS</b> · Priors &amp; Co",
+		"Тезисов в минуту: 0.3 (3 за 10 мин) · всего 14",
+		"Объём: 1ч $45.3K · 5м $1.5K\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("message missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "🚨") {
+		t.Errorf("growth alert uses the x2 headline:\n%s", got)
+	}
+}
+
 func TestFormatTrendingAndPartial(t *testing.T) {
 	a := sample()
 	a.Kind, a.Rank, a.Returned = KindTrending, 5, true

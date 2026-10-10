@@ -39,6 +39,13 @@ func ThesesFrom(items []fomo.Thesis) []Thesis {
 
 // Headline is the first line of the alert, without markup.
 func Headline(a Alert) string {
+	if a.Doubled {
+		n := a.Threshold
+		if n <= 0 {
+			n = a.Count
+		}
+		return fmt.Sprintf("X2 TRENDING · %d %s", n, PluralTheses(n))
+	}
 	if a.Kind == KindTrending {
 		s := "Новый токен в трендах fomo"
 		if a.Returned {
@@ -76,7 +83,10 @@ func Format(a Alert, loc *time.Location) string {
 	}
 	var b strings.Builder
 	icon := "🚨"
-	if a.Kind == KindTrending {
+	switch {
+	case a.Doubled:
+		icon = "⚡️"
+	case a.Kind == KindTrending:
 		icon = "🔥"
 	}
 	fmt.Fprintf(&b, "%s <b>%s</b>\n", icon, html.EscapeString(Headline(a)))

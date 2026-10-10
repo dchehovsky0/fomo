@@ -20,6 +20,7 @@ type fakeQ struct {
 	failed []string
 	calls  int
 	seq    [][]string
+	pools  []string
 	err    error
 }
 
@@ -31,6 +32,7 @@ func (f *fakeQ) Wave(_ context.Context, tokens []domain.Token) (map[string]domai
 	mints := make([]string, len(tokens))
 	for i, tok := range tokens {
 		mints[i] = tok.Mint
+		f.pools = append(f.pools, tok.Pool)
 	}
 	f.seq = append(f.seq, mints)
 	return f.vols, f.failed, f.err
@@ -520,6 +522,102 @@ func TestClosedPageLeavesTheRecheckDue(t *testing.T) {
 	g.mu.Unlock()
 	if !next.Equal(now) {
 		t.Fatalf("recheck postponed by %s", next.Sub(now))
+	}
+}
+
+func TestMigrationDropsTheFrozenCurve(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": vol5m(50560)}}
+	g := New(Config{MinVolume5m: 5000, Recheck: time.Hour}, q, quiet())
+	book := &memBook{tokens: []domain.Token{{Mint: "R", Symbol: "RODNEY", Pool: "curve"}}}
+	g.recheck(context.Background(), book)
+	g.recheck(context.Background(), book)
+	g.ResetStreak("R")
+	g.recheck(context.Background(), book)
+	if !book.has("R") {
+		t.Fatal("the same curve volume dropped the token after migration reset the streak")
+	}
+	g.mu.Lock()
+	tr := g.vol["R"]
+	g.mu.Unlock()
+	if tr == nil || tr.flat != 1 || tr.seen == false {
+		t.Fatalf("streak after one fresh sample: %+v", tr)
+	}
+
+	g.vol["R"] = &volTrack{flat: 2, seen: true, last: 50560, dropping: true, gen: 4}
+	g.ResetStreak("R")
+	g.dropWatched(book, domain.Token{Mint: "R", Pool: "curve"}, vol5m(50560), "объём застыл", 4)
+	if !book.has("R") {
+		t.Fatal("a drop already decided on the curve still removed the token")
+	}
+}
+
+func TestPendingVolumeFollowsTheNewPair(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": vol5m(8000)}}
+	g := New(Config{After: 10 * time.Second, MinVolume5m: 5000, Retry: time.Second}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	g.Add(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now})
+	if !g.RetargetPending(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm"}) {
+		t.Fatal("pending")
+	}
+	now = now.Add(10 * time.Second)
+	var passed domain.Token
+	g.wave(context.Background(), func(tok domain.Token) { passed = tok })
+	if passed.Pool != "amm" || passed.Dex != "Pump AMM" || len(q.pools) != 1 || q.pools[0] != "amm" {
+		t.Fatalf("passed %+v pools %v", passed, q.pools)
+	}
+}
+
+func TestInFlightCurveAnswerAdmitsTheNewPair(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": vol5m(8000)}}
+	g := New(Config{MinVolume5m: 5000, Retry: time.Second}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	curve := domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now.Add(-time.Minute)}
+	g.NoteMigration(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm"})
+	var got domain.Token
+	g.ask(context.Background(), []*item{{token: curve, born: curve.CreatedAt}}, func(tok domain.Token) { got = tok })
+	if got.Pool != "amm" || got.Dex != "Pump AMM" || got.EntryVolume.USD5m != 8000 {
+		t.Fatalf("admitted %+v", got)
+	}
+	g.mu.Lock()
+	_, back := g.pending["R"]
+	g.mu.Unlock()
+	if back {
+		t.Fatal("the curve check was queued again")
+	}
+}
+
+func TestInFlightCurveRefusalDoesNotRetryTheCurve(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": vol5m(10)}}
+	g := New(Config{MinVolume5m: 5000, Retry: time.Second}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	curve := domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now.Add(-time.Minute)}
+	g.NoteMigration(domain.Token{Mint: "R", Dex: "Pump AMM", Pool: "amm"})
+	g.ask(context.Background(), []*item{{token: curve, born: curve.CreatedAt}}, func(domain.Token) {
+		t.Fatal("a curve below the floor admitted the token")
+	})
+	g.mu.Lock()
+	_, back := g.pending["R"]
+	g.mu.Unlock()
+	if back {
+		t.Fatal("the curve was retried after the mint had moved")
+	}
+}
+
+func TestScreenPairWaitsForTheNewPool(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": {}}}
+	g := New(Config{MinVolume5m: 5000, Retry: time.Second, NoVolumeFor: 2 * time.Minute}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	g.ScreenPair(domain.Token{Mint: "R", Dex: "Pump AMM", Pool: "amm", CreatedAt: now.Add(-3 * time.Minute)})
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("empty new pair was admitted") })
+	g.mu.Lock()
+	_, still := g.pending["R"]
+	g.mu.Unlock()
+	if !still {
+		t.Fatal("the curve's age dropped the new pair on the first empty answer")
 	}
 }
 

@@ -110,7 +110,9 @@ type Watch struct {
 	Lifetime time.Duration `yaml:"lifetime"`
 	// VolumeFor: pair volume is checked only while the token has been
 	// in tier 1 for less than this. Zero means the whole lifetime.
-	VolumeFor   time.Duration `yaml:"volume_for"`
+	VolumeFor time.Duration `yaml:"volume_for"`
+	// MinTheses is the first alert. The token stays watched; later alerts
+	// go out at twice, four times, eight times this count. See TOKEN_TIERS.md.
 	MinTheses   int           `yaml:"min_theses"`
 	ThesisLimit int           `yaml:"thesis_limit"`
 	Schedule    []WatchTier   `yaml:"schedule"`
@@ -274,9 +276,9 @@ func Default() Config {
 			MinTheses:   3,
 			ThesisLimit: 500,
 			Schedule: []WatchTier{
-				{MaxAge: 20 * time.Minute, Every: 2 * time.Second},
-				{MaxAge: 50 * time.Minute, Every: 5 * time.Second},
-				{MaxAge: 110 * time.Minute, Every: 30 * time.Second},
+				{MaxAge: 10 * time.Minute, Every: 3 * time.Second},
+				{MaxAge: 20 * time.Minute, Every: 7 * time.Second},
+				{MaxAge: 60 * time.Minute, Every: 30 * time.Second},
 				{MaxAge: 49*time.Hour + 50*time.Minute, Every: 2 * time.Minute},
 			},
 			RetryDelay: 30 * time.Second,

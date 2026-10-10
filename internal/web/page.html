@@ -130,7 +130,7 @@ h2 .hint { font-size: 12px; font-weight: 500; color: var(--amber); }
 </head>
 <body>
 <main class="wrap">
-  {{if eq .A.Kind "trending"}}<span class="badge trending">🔥 {{.Headline}}</span>{{else}}<span class="badge">🚨 {{.Headline}}</span>{{end}}
+  {{if .A.Doubled}}<span class="badge">⚡️ {{.Headline}}</span>{{else if eq .A.Kind "trending"}}<span class="badge trending">🔥 {{.Headline}}</span>{{else}}<span class="badge">🚨 {{.Headline}}</span>{{end}}
 
   <section class="hero">
     <div class="logo">{{.Initial}}{{if .A.ImageURL}}<img src="{{.A.ImageURL}}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">{{end}}</div>

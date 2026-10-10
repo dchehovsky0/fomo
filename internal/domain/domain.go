@@ -101,8 +101,11 @@ type Thesis struct {
 type Alert struct {
 	Kind      string `json:"kind"`
 	Threshold int    `json:"threshold,omitempty"`
-	Rank      int    `json:"rank,omitempty"`
-	Returned  bool   `json:"returned,omitempty"`
+	// Doubled is a growth alert: the thesis count hit the next doubling
+	// after the first alert (6, 12, 24, …).
+	Doubled  bool `json:"doubled,omitempty"`
+	Rank     int  `json:"rank,omitempty"`
+	Returned bool `json:"returned,omitempty"`
 
 	Token    string `json:"token"`
 	Symbol   string `json:"symbol"`

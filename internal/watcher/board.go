@@ -14,8 +14,8 @@ import (
 
 // Board is the watch list as the operator's page shows it. Tier comes from
 // the schedule and the time since the token entered tier 1, the same clock
-// the checks use. Tokens already alerted or dropped are not here: they are
-// no longer in the watch list.
+// the checks use. A thesis alert leaves the token here. Dropped and expired
+// tokens are gone from the list.
 type Board struct {
 	AsOf     time.Time    `json:"as_of"`
 	Need     int          `json:"need"`
@@ -34,16 +34,18 @@ type BoardTier struct {
 
 // BoardToken is one token currently being asked about on fomo.
 type BoardToken struct {
-	Mint     string `json:"mint"`
-	Symbol   string `json:"symbol"`
-	Name     string `json:"name"`
-	Dex      string `json:"dex,omitempty"`
-	Pool     string `json:"pool,omitempty"`
-	Tier     int    `json:"tier"`
-	AgeMS    int64  `json:"age_ms"`
-	LeftMS   int64  `json:"left_ms"`
-	EveryMS  int64  `json:"every_ms"`
-	Theses   int    `json:"theses"`
+	Mint    string `json:"mint"`
+	Symbol  string `json:"symbol"`
+	Name    string `json:"name"`
+	Dex     string `json:"dex,omitempty"`
+	Pool    string `json:"pool,omitempty"`
+	Tier    int    `json:"tier"`
+	AgeMS   int64  `json:"age_ms"`
+	LeftMS  int64  `json:"left_ms"`
+	EveryMS int64  `json:"every_ms"`
+	Theses  int    `json:"theses"`
+	// Need is the next thesis count that sends an alert for this token.
+	Need     int    `json:"need,omitempty"`
 	Checked  bool   `json:"checked"`
 	Checks   int    `json:"checks"`
 	NextMS   int64  `json:"next_ms"`
@@ -177,7 +179,7 @@ func (w *Watcher) Board() Board {
 		b.Tokens = append(b.Tokens, BoardToken{
 			Mint: it.l.Mint, Symbol: it.l.Symbol, Name: it.l.Name, Dex: it.l.Dex, Pool: it.l.Pool,
 			Tier: tier, AgeMS: age.Milliseconds(), LeftMS: left.Milliseconds(), EveryMS: every.Milliseconds(),
-			Theses: it.count, Checked: it.checks > 0, Checks: it.checks, NextMS: next, FailKind: it.failKind,
+			Theses: it.count, Need: alertNeed(it.notified, w.cfg.MinTheses), Checked: it.checks > 0, Checks: it.checks, NextMS: next, FailKind: it.failKind,
 			FomoMS:   it.fomoMS,
 			ImageURL: pickImage(it),
 			Volume:   it.volume, EntryVolume5m: it.l.EntryVolume.USD5m,
@@ -304,7 +306,7 @@ func (w *Watcher) Live(mint, fomoTpl, axiomTpl string) (LiveToken, bool) {
 	image := pickImage(it)
 	return LiveToken{
 		Mint: it.l.Mint, Symbol: it.l.Symbol, Name: it.l.Name, Chain: "Solana", Dex: it.l.Dex,
-		Tier: w.tierNumber(age), ImageURL: image, Count: it.count, Need: w.cfg.MinTheses,
+		Tier: w.tierNumber(age), ImageURL: image, Count: it.count, Need: alertNeed(it.notified, w.cfg.MinTheses),
 		Checked: it.checks > 0, CheckedAt: it.seenAt, FomoMS: it.fomoMS, CreatedAt: it.l.CreatedAt,
 		FomoURL: linkTemplate(fomoTpl, it.l.Mint, ""), AxiomURL: linkTemplate(axiomTpl, it.l.Mint, it.l.Pool),
 		Live: true, Theses: theses,

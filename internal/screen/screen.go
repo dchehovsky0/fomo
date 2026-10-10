@@ -53,10 +53,13 @@ type Gate struct {
 
 	mu      sync.Mutex
 	pending map[string]*item
-	dex     map[string]*volState
-	dexOrd  []string
-	dexSum  Health
-	vol     map[string]*volTrack
+	// migrated is the Pump AMM pair for a mint whose first volume read may
+	// still be in flight on the bonding curve.
+	migrated map[string]domain.Token
+	dex      map[string]*volState
+	dexOrd   []string
+	dexSum   Health
+	vol      map[string]*volTrack
 	// closedUntil holds the lane when the stats window is not open yet.
 	// Reads in that stretch are not attempts and are not paced.
 	closedUntil time.Time
@@ -71,6 +74,10 @@ type volTrack struct {
 	last float64
 	seen bool
 	next time.Time
+	// gen changes when a Pump AMM migration throws the streak away.
+	// dropping is set only for the sample that decided to release the token.
+	gen      int
+	dropping bool
 }
 
 type item struct {
@@ -150,7 +157,8 @@ func New(cfg Config, q Querier, log *slog.Logger) *Gate {
 	}
 	return &Gate{
 		cfg: cfg, q: q, log: log, now: time.Now, pending: map[string]*item{},
-		dex: map[string]*volState{}, vol: map[string]*volTrack{},
+		migrated: map[string]domain.Token{},
+		dex:      map[string]*volState{}, vol: map[string]*volTrack{},
 		dexSum: Health{VolumeFromRequest: map[int]int{}},
 	}
 }
@@ -172,6 +180,88 @@ func (g *Gate) Add(token domain.Token) {
 		return
 	}
 	g.pending[token.Mint] = &item{token: token, due: due, born: born}
+}
+
+// NoteMigration remembers the Pump AMM pair. A volume read already in flight
+// still carries the curve; the admission uses this pair instead.
+func (g *Gate) NoteMigration(token domain.Token) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.migrated[token.Mint] = token
+}
+
+// pairNow is the pair a volume result must admit, when the mint has migrated.
+// g.mu must be held.
+func (g *Gate) pairNow(tok domain.Token) domain.Token {
+	next, ok := g.migrated[tok.Mint]
+	if !ok || next.Pool == "" {
+		return tok
+	}
+	tok.Dex = next.Dex
+	tok.Pool = next.Pool
+	return tok
+}
+
+// RetargetPending points a token still waiting for its first volume read at
+// a new pair. The due time stays. False means the mint is not waiting.
+func (g *Gate) RetargetPending(token domain.Token) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	it := g.pending[token.Mint]
+	if it == nil {
+		return false
+	}
+	it.token.Dex = token.Dex
+	it.token.Pool = token.Pool
+	g.log.Info("flow", "step", "объём", "decision", "миграция",
+		"why", "ждём объём новой пары",
+		"token", token.Mint, "ticker", token.Symbol, "pair", token.Pool)
+	return true
+}
+
+// ScreenPair queues a pair that was not admitted on the bonding curve.
+// The no-volume clock starts now, so a just-opened Pump AMM pool gets the
+// full wait instead of the curve's age.
+func (g *Gate) ScreenPair(token domain.Token) {
+	now := g.now()
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if _, ok := g.pending[token.Mint]; ok {
+		return
+	}
+	if st := g.dex[token.Mint]; st != nil && st.done {
+		if st.tok.Decision == "пропуск" {
+			if g.dexSum.Dropped > 0 {
+				g.dexSum.Dropped--
+			}
+			if !st.sawVolume && g.dexSum.NeverVolume > 0 {
+				g.dexSum.NeverVolume--
+			}
+		}
+		st.done = false
+		st.tok.Decision = ""
+		st.tok.Why = ""
+	}
+	g.pending[token.Mint] = &item{token: token, due: now, born: now}
+}
+
+// ResetStreak forgets volume samples that belong to the pair the token left.
+// The next recheck is due immediately and reads whatever pair the book has now.
+func (g *Gate) ResetStreak(mint string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	tr := g.vol[mint]
+	if tr == nil {
+		g.vol[mint] = &volTrack{next: g.now()}
+		return
+	}
+	tr.gen++
+	tr.dropping = false
+	tr.bad = 0
+	tr.flat = 0
+	tr.last = 0
+	tr.seen = false
+	tr.next = g.now()
 }
 
 // Run asks for one due token at a time and emits those whose volume clears
@@ -410,6 +500,18 @@ func (g *Gate) ask(ctx context.Context, batch []*item, emit func(domain.Token)) 
 				decision, why = "в работу", "объём выше порога"
 			}
 		}
+		g.mu.Lock()
+		admitted := g.pairNow(it.token)
+		moved := admitted.Pool != it.token.Pool
+		g.mu.Unlock()
+		// A curve answer that does not clear the filter is not retried: the
+		// Pump AMM pair has its own check. A pass admits that pair.
+		if moved && decision != "в работу" {
+			g.log.Info("flow", "step", "объём", "decision", "миграция",
+				"why", "ответ кривой не решает",
+				"token", mint, "ticker", it.token.Symbol, "pair", admitted.Pool)
+			continue
+		}
 		g.record(it, att, decision, why)
 		if decision == "" {
 			why := "ещё нет объёма"
@@ -427,7 +529,7 @@ func (g *Gate) ask(ctx context.Context, batch []*item, emit func(domain.Token)) 
 		if decision == "пропуск" {
 			continue
 		}
-		tok := it.token
+		tok := admitted
 		tok.EntryVolume = v
 		emit(tok)
 	}
@@ -673,22 +775,57 @@ func (g *Gate) judgeVolume(book Book, tok domain.Token, v domain.Volume) {
 		tr.seen = true
 	}
 	bad, flat := tr.bad, tr.flat
+	var gen int
+	if bad >= lowSamples || flat >= flatSamples {
+		tr.gen++
+		tr.dropping = true
+		gen = tr.gen
+	} else {
+		tr.dropping = false
+	}
 	g.mu.Unlock()
 	if bad >= lowSamples {
-		g.dropWatched(book, tok, v, "объём за 5 минут ниже порога три замера подряд")
+		g.dropWatched(book, tok, v, "объём за 5 минут ниже порога три замера подряд", gen)
 		return
 	}
 	if flat >= flatSamples {
-		g.dropWatched(book, tok, v, "объём за 5 минут не меняется три замера подряд")
+		g.dropWatched(book, tok, v, "объём за 5 минут не меняется три замера подряд", gen)
 	}
 }
 
-func (g *Gate) dropWatched(book Book, tok domain.Token, v domain.Volume, why string) {
-	if !book.Release(tok.Mint) {
+// pairRelease drops a token only while it is still measured on pool.
+// After a migration the book holds the new pair, and a sample from the
+// curve must not take the token off the list.
+type pairRelease interface {
+	ReleasePair(mint, pool string) bool
+}
+
+func (g *Gate) dropWatched(book Book, tok domain.Token, v domain.Volume, why string, gen int) {
+	g.mu.Lock()
+	tr := g.vol[tok.Mint]
+	if tr == nil || !tr.dropping || tr.gen != gen {
+		g.mu.Unlock()
+		return
+	}
+	g.mu.Unlock()
+	released := false
+	if pr, ok := book.(pairRelease); ok {
+		released = pr.ReleasePair(tok.Mint, tok.Pool)
+	} else {
+		released = book.Release(tok.Mint)
+	}
+	if !released {
+		g.mu.Lock()
+		if cur := g.vol[tok.Mint]; cur != nil && cur.gen == gen {
+			cur.dropping = false
+		}
+		g.mu.Unlock()
 		return
 	}
 	g.mu.Lock()
-	delete(g.vol, tok.Mint)
+	if cur := g.vol[tok.Mint]; cur != nil && cur.gen == gen {
+		delete(g.vol, tok.Mint)
+	}
 	g.mu.Unlock()
 	g.log.Info("flow", "step", "объём", "decision", "снят",
 		"why", why, "token", tok.Mint, "ticker", tok.Symbol,

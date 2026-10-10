@@ -2,6 +2,10 @@
 // launch per mint, only the configured protocols, nothing older than the
 // lifetime. The stream is real time only: tokens launched while the bot is
 // down are not read later.
+//
+// A mint already taken as Pump V1 is the exception. When that same mint
+// shows up as Pump AMM, the new pair replaces the bonding curve. That is a
+// migration, not a second token.
 package launches
 
 import (
@@ -41,6 +45,7 @@ type Stats struct {
 	Received   atomic.Int64
 	Emitted    atomic.Int64
 	Duplicates atomic.Int64 // another pool of a mint already seen
+	Migrated   atomic.Int64 // Pump V1 mint retargeted to Pump AMM
 	Filtered   atomic.Int64 // protocol not in the list
 	Old        atomic.Int64 // created longer than the lifetime ago
 }
@@ -57,6 +62,11 @@ type Source struct {
 	mu      sync.Mutex
 	seen    map[string]Launch
 	byProto map[string]int64
+
+	// OnMigrate is called when a mint already emitted as Pump V1 arrives as
+	// Pump AMM. The launch keeps the original creation time and carries the
+	// new pair. Set it before Run.
+	OnMigrate func(Launch)
 }
 
 func New(stream Stream, cfg Config, log *slog.Logger) *Source {
@@ -131,15 +141,39 @@ func (s *Source) handle(p axiom.Pair, emit func(Launch)) bool {
 			"token", p.Token, "ticker", p.Ticker, "protocol", label)
 		return false
 	}
+	at := p.CreatedAt
+	if at.IsZero() || at.After(now) {
+		at = now
+	}
+
+	s.mu.Lock()
+	if prev, ok := s.seen[p.Token]; ok {
+		if next, migrated := migratePump(prev, p); migrated {
+			s.seen[p.Token] = next
+			s.mu.Unlock()
+			s.Stats.Migrated.Add(1)
+			s.log.Info("flow", "step", "обработали", "decision", "миграция",
+				"why", "pump v1 перешёл на pump amm",
+				"token", p.Token, "ticker", p.Ticker, "protocol", label,
+				"pair", next.Pool, "old_pair", prev.Pool)
+			if s.OnMigrate != nil {
+				s.OnMigrate(next)
+			}
+			return true
+		}
+		s.mu.Unlock()
+		s.Stats.Duplicates.Add(1)
+		s.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "этот токен уже видели",
+			"token", p.Token, "ticker", p.Ticker, "protocol", label)
+		return false
+	}
+	s.mu.Unlock()
+
 	if len(s.protocols) > 0 && !s.protocols[strings.ToLower(p.Protocol)] && !s.protocols[strings.ToLower(p.DisplayProtocol)] {
 		s.Stats.Filtered.Add(1)
 		s.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "протокол не в списке",
 			"token", p.Token, "ticker", p.Ticker, "protocol", label)
 		return false
-	}
-	at := p.CreatedAt
-	if at.IsZero() || at.After(now) {
-		at = now
 	}
 
 	s.mu.Lock()
@@ -166,6 +200,23 @@ func (s *Source) handle(p axiom.Pair, emit func(Launch)) bool {
 		"token", p.Token, "ticker", p.Ticker, "name", p.Name, "protocol", label, "age", age, "pair", p.Pair)
 	emit(l)
 	return true
+}
+
+// migratePump reports a bonding-curve mint that just graduated. The new
+// launch keeps the curve's creation time and takes the Pump AMM pair.
+// Anything else, including a second Pump V1 pool or the same pair again,
+// is a duplicate.
+func migratePump(prev Launch, p axiom.Pair) (Launch, bool) {
+	if !strings.EqualFold(strings.TrimSpace(prev.Dex), "Pump V1") || !strings.EqualFold(strings.TrimSpace(p.Label()), "Pump AMM") {
+		return Launch{}, false
+	}
+	if p.Pair == "" || p.Pair == prev.Pool {
+		return Launch{}, false
+	}
+	next := prev
+	next.Dex = p.Label()
+	next.Pool = p.Pair
+	return next, true
 }
 
 func launchFrom(p axiom.Pair, at time.Time) Launch {

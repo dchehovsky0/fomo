@@ -100,3 +100,40 @@ func TestSkippedProtocolNeverEnters(t *testing.T) {
 		t.Fatalf("blocked M=%v P=%v", s.Blocked("M"), s.Blocked("P"))
 	}
 }
+
+func TestPumpV1MigratesToPumpAMM(t *testing.T) {
+	now := time.Date(2026, 10, 7, 19, 24, 36, 0, time.UTC)
+	curve := pair("R", "Pump V1", now)
+	curve.Pair = "curve"
+	meteora := pair("R", "Meteora AMM V2", now.Add(time.Minute))
+	meteora.Pair = "meteora"
+	amm := pair("R", "Pump AMM", now.Add(2*time.Minute))
+	amm.Pair = "amm"
+	again := amm
+	again.Pair = "amm-2"
+	other := pair("Q", "Pump AMM", now)
+	stream := fakeStream{curve, meteora, amm, again, other}
+	s := New(stream, Config{
+		Protocols: []string{"Pump V1"}, SkipProtocols: []string{"Meteora AMM V2"}, Lifetime: time.Hour,
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	s.now = func() time.Time { return now.Add(3 * time.Minute) }
+	var migrated []Launch
+	s.OnMigrate = func(l Launch) { migrated = append(migrated, l) }
+	var got []Launch
+	s.Run(context.Background(), func(l Launch) { got = append(got, l) })
+
+	if len(got) != 1 || got[0].Mint != "R" || got[0].Pool != "curve" || got[0].Dex != "Pump V1" {
+		t.Fatalf("emitted %+v", got)
+	}
+	if len(migrated) != 1 || migrated[0].Pool != "amm" || migrated[0].Dex != "Pump AMM" || !migrated[0].CreatedAt.Equal(now) {
+		t.Fatalf("migrated %+v", migrated)
+	}
+	look, ok := s.Lookup("R")
+	if !ok || look.Pool != "amm" || look.Dex != "Pump AMM" {
+		t.Fatalf("lookup %+v %v", look, ok)
+	}
+	if s.Stats.Migrated.Load() != 1 || s.Stats.Duplicates.Load() != 1 || s.Stats.Emitted.Load() != 1 || s.Stats.Filtered.Load() != 2 {
+		t.Fatalf("migrated=%d dup=%d emitted=%d filtered=%d",
+			s.Stats.Migrated.Load(), s.Stats.Duplicates.Load(), s.Stats.Emitted.Load(), s.Stats.Filtered.Load())
+	}
+}

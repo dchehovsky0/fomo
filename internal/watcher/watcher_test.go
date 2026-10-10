@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -162,17 +163,100 @@ func TestSignalWhenThresholdReached(t *testing.T) {
 	if s.Token != "M" || s.Count != 3 || s.Symbol != "TKN" || s.Name != "Axiom Name" || s.Dex != "Pump V1" || s.Kind != notify.KindTheses || s.Threshold != 3 || s.CreatedAt.IsZero() {
 		t.Errorf("signal = %+v", s)
 	}
-	waitFor(t, "stored as signaled and dropped", func() bool { return st.IsSignaled("M") && w.Snapshot().Watching == 0 })
-	if delays := w.Delays(); len(delays) != 1 || delays[0].PrevCount != 1 || delays[0].Count != 3 || delays[0].Why == "" {
+	waitFor(t, "stored as signaled and still watched", func() bool { return st.IsSignaled("M") && w.Snapshot().Watching == 1 })
+	if delays := w.Delays(); len(delays) != 1 || delays[0].PrevCount != 1 || delays[0].Count != 3 || delays[0].Threshold != 3 || delays[0].Why == "" {
 		t.Fatalf("delay = %+v", delays)
 	}
+	if vols := w.VolumeTokens(); len(vols) != 1 || vols[0].Mint != "M" {
+		t.Fatalf("volume watch = %+v", vols)
+	}
 	w.Add(launches.Launch{Mint: "M", CreatedAt: time.Now()})
-	if w.Snapshot().Watching != 0 {
-		t.Error("signaled token must not be watched again")
+	if w.Snapshot().Watching != 1 {
+		t.Error("a second admission must not open another watch")
 	}
 	time.Sleep(60 * time.Millisecond)
 	if len(n.signals()) != 1 {
 		t.Errorf("sent %d signals, want 1", len(n.signals()))
+	}
+}
+
+func TestDoublingAlertsStayOnTheList(t *testing.T) {
+	f := &fakeFomo{counts: map[string]int{"M": 2}}
+	n := &fakeNotifier{}
+	st, _ := store.Open("")
+	w := New(testConfig(), []Account{{Name: "a", Client: f, Workers: 1}}, n, st, quiet())
+	start(t, w)
+	w.Add(domain.Token{Mint: "M", Symbol: "S", Name: "Name", CreatedAt: time.Now().Add(-time.Minute)})
+	waitFor(t, "a check below three", func() bool { return f.calls.Load() >= 1 })
+	if len(n.signals()) != 0 {
+		t.Fatal("alert before three theses")
+	}
+
+	f.set("M", 20)
+	waitFor(t, "one alert per crossed rung", func() bool { return len(n.signals()) == 3 })
+	got := n.signals()
+	for i, want := range []int{3, 6, 12} {
+		if got[i].Threshold != want || got[i].Count != 20 || got[i].Doubled != (want != 3) {
+			t.Fatalf("signal %d = %+v", i, got[i])
+		}
+	}
+	if w.Snapshot().Watching != 1 {
+		t.Fatal("token left after the alerts")
+	}
+	if live, ok := w.Live("M", "", ""); !ok || live.Count != 20 || live.Need != 24 {
+		t.Fatalf("live = %+v ok=%v", live, ok)
+	}
+	time.Sleep(80 * time.Millisecond)
+	if len(n.signals()) != 3 {
+		t.Fatalf("sent %d, the next rung is 24", len(n.signals()))
+	}
+
+	f.set("M", 24)
+	waitFor(t, "the 24 rung", func() bool { return len(n.signals()) == 4 })
+	if s := n.signals()[3]; !s.Doubled || s.Threshold != 24 || s.Count != 24 {
+		t.Fatalf("signal = %+v", s)
+	}
+	if !w.Release("M") || w.Snapshot().Watching != 0 {
+		t.Fatal("a watched token must still leave when released")
+	}
+}
+
+func TestRestartContinuesFromTheStoredRung(t *testing.T) {
+	f := &fakeFomo{counts: map[string]int{"M": 8}}
+	n := &fakeNotifier{}
+	st, _ := store.Open("")
+	if err := st.MarkSignaled(store.Signal{Token: "M", Count: 8, Threshold: 6, SentAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	w := New(testConfig(), []Account{{Name: "a", Client: f, Workers: 1}}, n, st, quiet())
+	start(t, w)
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: time.Now()})
+	time.Sleep(80 * time.Millisecond)
+	if len(n.signals()) != 0 || w.Snapshot().Watching != 1 {
+		t.Fatalf("signals %d watching %d", len(n.signals()), w.Snapshot().Watching)
+	}
+	f.set("M", 12)
+	waitFor(t, "next doubling", func() bool { return len(n.signals()) == 1 })
+	if s := n.signals()[0]; !s.Doubled || s.Threshold != 12 || s.Count != 12 {
+		t.Fatalf("signal = %+v", s)
+	}
+}
+
+func TestNextRung(t *testing.T) {
+	if nextRung(0, 3) != 3 || nextRung(3, 3) != 6 || nextRung(6, 3) != 12 || nextRung(12, 3) != 24 {
+		t.Fatalf("rungs %d %d %d %d", nextRung(0, 3), nextRung(3, 3), nextRung(6, 3), nextRung(12, 3))
+	}
+	if nextRung(math.MaxInt/2+1, 3) != 0 {
+		t.Fatal("rung must stop before overflow")
+	}
+	if got := rungReached(3, store.Signal{Threshold: 6, Count: 20}); got != 6 {
+		t.Fatalf("stored rung = %d", got)
+	}
+	if got := rungReached(3, store.Signal{Count: 5}); got != 3 {
+		t.Fatalf("old count rung = %d", got)
+	}
+	if got := rungReached(3, store.Signal{Count: 12}); got != 12 {
+		t.Fatalf("old count walk = %d", got)
 	}
 }
 
@@ -182,18 +266,33 @@ func TestAlertWhenItemsCrossThresholdBeforeCount(t *testing.T) {
 	for _, apiCount := range []int{0, 2} {
 		f := &itemsAhead{count: apiCount}
 		n := &fakeNotifier{}
+		at := &callsAtSend{n: n, src: &f.calls}
 		st, _ := store.Open("")
-		w := New(testConfig(), []Account{{Name: "a", Client: f, Workers: 1}}, n, st, quiet())
+		w := New(testConfig(), []Account{{Name: "a", Client: f, Workers: 1}}, at, st, quiet())
 		start(t, w)
 		w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: time.Now().Add(-time.Minute)})
 		waitFor(t, "signal while count lags", func() bool { return len(n.signals()) == 1 })
-		if calls := f.calls.Load(); calls != 1 {
-			t.Fatalf("api count %d: requests=%d, want the first response", apiCount, calls)
+		if calls := at.at.Load(); calls != 1 {
+			t.Fatalf("api count %d: alert left on request %d, want the first response", apiCount, calls)
 		}
-		if got := n.signals()[0].Count; got != 3 {
-			t.Fatalf("api count %d: alert count=%d, want 3", apiCount, got)
+		if got := n.signals()[0].Count; got != 3 || n.signals()[0].Doubled {
+			t.Fatalf("api count %d: alert = %+v", apiCount, n.signals()[0])
 		}
 	}
+}
+
+// callsAtSend records how many fomo requests had run when the first alert left.
+type callsAtSend struct {
+	n   *fakeNotifier
+	src *atomic.Int64
+	at  atomic.Int64
+}
+
+func (c *callsAtSend) Send(ctx context.Context, a notify.Alert) error {
+	if c.at.Load() == 0 {
+		c.at.Store(c.src.Load())
+	}
+	return c.n.Send(ctx, a)
 }
 
 type itemsAhead struct {
@@ -480,6 +579,15 @@ func (b *memTiers) SetWatchStatus(_ context.Context, _, status string, _ time.Ti
 	return nil
 }
 
+func (b *memTiers) WatchStatus(context.Context, string) (string, bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.status == "" && b.tier == 0 {
+		return "", false, nil
+	}
+	return b.status, true, nil
+}
+
 func (b *memTiers) snapshot() (int, []int, string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -681,6 +789,90 @@ func TestGapPartsNameTheMeasuredCause(t *testing.T) {
 	}}
 	if got, ok := thresholdThesisAt(full, 3); !ok || !got.Equal(at(6, 42, 0)) {
 		t.Fatalf("3rd thesis = %v %v", got, ok)
+	}
+}
+
+func TestMigrationKeepsTheTokenOnTheNewPair(t *testing.T) {
+	st, _ := store.Open("")
+	book := &memTiers{}
+	w := New(testConfig(), nil, nil, st, quiet())
+	w.SetTiers(book)
+	now := time.Now()
+	w.now = func() time.Time { return now }
+	w.Add(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now})
+	if !w.Retarget(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm"}) {
+		t.Fatal("retarget")
+	}
+	got := w.Tokens()
+	if w.Watching() != 1 || len(got) != 1 || got[0].Pool != "amm" || got[0].Dex != "Pump AMM" {
+		t.Fatalf("watching %d %+v", w.Watching(), got)
+	}
+	if w.ReleasePair("R", "curve") {
+		t.Fatal("a sample from the curve dropped the migrated token")
+	}
+	if w.Watching() != 1 {
+		t.Fatal("token left after the old pair")
+	}
+	if !w.ReleasePair("R", "amm") || w.Watching() != 0 {
+		t.Fatal("the new pair must still be droppable")
+	}
+	if !w.ReopenDropped("R") {
+		t.Fatal("reopen")
+	}
+	w.Add(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm", CreatedAt: now})
+	if w.Watching() != 1 || w.Tokens()[0].Pool != "amm" {
+		t.Fatalf("after reopen watching %d %+v", w.Watching(), w.Tokens())
+	}
+	if !w.Release("R") {
+		t.Fatal("release")
+	}
+	if err := book.SetWatchStatus(context.Background(), "R", "alerted", now); err != nil {
+		t.Fatal(err)
+	}
+	if w.ReopenDropped("R") {
+		t.Fatal("an alerted token must stay finished")
+	}
+}
+
+func TestAdmissionInFlightLandsOnTheNewPair(t *testing.T) {
+	st, _ := store.Open("")
+	w := New(testConfig(), nil, nil, st, quiet())
+	now := time.Now()
+	w.now = func() time.Time { return now }
+	amm := domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm", CreatedAt: now}
+	if w.NoteMigration(amm) {
+		t.Fatal("nothing is watched yet")
+	}
+	w.Add(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now})
+	got := w.Tokens()
+	if w.Watching() != 1 || len(got) != 1 || got[0].Pool != "amm" || got[0].Dex != "Pump AMM" {
+		t.Fatalf("watching %d %+v", w.Watching(), got)
+	}
+}
+
+func TestHandReleaseIsNotBroughtBackByMigration(t *testing.T) {
+	st, _ := store.Open("")
+	book := &memTiers{}
+	w := New(testConfig(), nil, nil, st, quiet())
+	w.SetTiers(book)
+	now := time.Now()
+	w.now = func() time.Time { return now }
+	w.Add(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now})
+	if w.ReleaseMints([]string{"R"}) != 1 || !w.Dismissed("R") {
+		t.Fatal("dismiss")
+	}
+	if _, _, status := book.snapshot(); status != "removed" {
+		t.Fatalf("status = %s", status)
+	}
+	if w.NoteMigration(domain.Token{Mint: "R", Dex: "Pump AMM", Pool: "amm"}) {
+		t.Fatal("a removed token was retargeted")
+	}
+	w.Add(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm", CreatedAt: now})
+	if w.Watching() != 0 {
+		t.Fatal("migration put a hand-removed token back")
+	}
+	if w.ReopenDropped("R") {
+		t.Fatal("a hand removal was treated as a volume drop")
 	}
 }
 

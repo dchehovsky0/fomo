@@ -2,7 +2,10 @@ package db
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"fomobot/internal/domain"
 )
@@ -44,6 +47,18 @@ UPDATE watch_tokens SET
 WHERE token_address = $1 AND tier <> $2`,
 		mint, tier, at)
 	return err
+}
+
+// WatchStatus is the stored status of mint. ok is false when no row exists.
+func (d *DB) WatchStatus(ctx context.Context, mint string) (status string, ok bool, err error) {
+	err = d.pool.QueryRow(ctx, `SELECT status FROM watch_tokens WHERE token_address = $1`, mint).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return status, true, nil
 }
 
 // SetWatchStatus records why the token left the tiers, or that it is watched.

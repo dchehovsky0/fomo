@@ -13,10 +13,13 @@ import (
 )
 
 type Signal struct {
-	Token  string    `json:"token"`
-	Ticker string    `json:"ticker,omitempty"`
-	Count  int       `json:"count"`
-	SentAt time.Time `json:"sent_at"`
+	Token  string `json:"token"`
+	Ticker string `json:"ticker,omitempty"`
+	Count  int    `json:"count"`
+	// Threshold is the rung we already sent: 3, then 6, 12, 24.
+	// Older rows leave it empty and only store Count.
+	Threshold int       `json:"threshold,omitempty"`
+	SentAt    time.Time `json:"sent_at"`
 }
 
 type state struct {
@@ -127,10 +130,16 @@ func (s *Store) PruneTrending(before time.Time) int {
 }
 
 func (s *Store) IsSignaled(token string) bool {
+	_, ok := s.Signal(token)
+	return ok
+}
+
+// Signal is the last alert stored for token.
+func (s *Store) Signal(token string) (Signal, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, ok := s.st.Signals[token]
-	return ok
+	sig, ok := s.st.Signals[token]
+	return sig, ok
 }
 
 // MarkSignaled persists immediately: losing it in a crash means a duplicate alert.

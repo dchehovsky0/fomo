@@ -55,11 +55,28 @@ accounts:
   - {name: acc16, chrome_profile_dir: ./profiles/acc16, debug_url: "http://127.0.0.1:9236", rps: 1, workers: 1}
   - {name: acc17, chrome_profile_dir: ./profiles/acc17, debug_url: "http://127.0.0.1:9237", rps: 1, workers: 1}
   - {name: acc18, chrome_profile_dir: ./profiles/acc18, debug_url: "http://127.0.0.1:9238", rps: 1, workers: 1}
-  # - {name: acc19, chrome_profile_dir: ./profiles/acc19, debug_url: "http://127.0.0.1:9239", rps: 1, workers: 1}
-  # - {name: acc20, chrome_profile_dir: ./profiles/acc20, debug_url: "http://127.0.0.1:9240", rps: 1, workers: 1}
-  # - {name: acc21, chrome_profile_dir: ./profiles/acc21, debug_url: "http://127.0.0.1:9241", rps: 1, workers: 1}
-  # - {name: acc22, chrome_profile_dir: ./profiles/acc22, debug_url: "http://127.0.0.1:9242", rps: 1, workers: 1}
-  # - {name: acc23, chrome_profile_dir: ./profiles/acc23, debug_url: "http://127.0.0.1:9243", rps: 1, workers: 1}
+  - {name: acc19, chrome_profile_dir: ./profiles/acc19, debug_url: "http://127.0.0.1:9239", rps: 1, workers: 1}
+  - {name: acc20, chrome_profile_dir: ./profiles/acc20, debug_url: "http://127.0.0.1:9240", rps: 1, workers: 1}
+  - {name: acc21, chrome_profile_dir: ./profiles/acc21, debug_url: "http://127.0.0.1:9241", rps: 1, workers: 1}
+  - {name: acc22, chrome_profile_dir: ./profiles/acc22, debug_url: "http://127.0.0.1:9242", rps: 1, workers: 1}
+  - {name: acc23, chrome_profile_dir: ./profiles/acc23, debug_url: "http://127.0.0.1:9243", rps: 1, workers: 1}
+  - {name: acc24, chrome_profile_dir: ./profiles/acc24, debug_url: "http://127.0.0.1:9244", rps: 1, workers: 1}
+  - {name: acc25, chrome_profile_dir: ./profiles/acc25, debug_url: "http://127.0.0.1:9245", rps: 1, workers: 1}
+  - {name: acc26, chrome_profile_dir: ./profiles/acc26, debug_url: "http://127.0.0.1:9246", rps: 1, workers: 1}
+  - {name: acc27, chrome_profile_dir: ./profiles/acc27, debug_url: "http://127.0.0.1:9267", rps: 1, workers: 1}
+  - {name: acc28, chrome_profile_dir: ./profiles/acc28, debug_url: "http://127.0.0.1:9248", rps: 1, workers: 1}
+  - {name: acc29, chrome_profile_dir: ./profiles/acc29, debug_url: "http://127.0.0.1:9249", rps: 1, workers: 1}
+  - {name: acc30, chrome_profile_dir: ./profiles/acc30, debug_url: "http://127.0.0.1:9250", rps: 1, workers: 1}
+  - {name: acc31, chrome_profile_dir: ./profiles/acc31, debug_url: "http://127.0.0.1:9251", rps: 1, workers: 1}
+  - {name: acc32, chrome_profile_dir: ./profiles/acc32, debug_url: "http://127.0.0.1:9252", rps: 1, workers: 1}
+  - {name: acc33, chrome_profile_dir: ./profiles/acc33, debug_url: "http://127.0.0.1:9253", rps: 1, workers: 1}
+  - {name: acc34, chrome_profile_dir: ./profiles/acc34, debug_url: "http://127.0.0.1:9254", rps: 1, workers: 1}
+  - {name: acc35, chrome_profile_dir: ./profiles/acc35, debug_url: "http://127.0.0.1:9255", rps: 1, workers: 1}
+  - {name: acc36, chrome_profile_dir: ./profiles/acc36, debug_url: "http://127.0.0.1:9256", rps: 1, workers: 1}
+  - {name: acc37, chrome_profile_dir: ./profiles/acc37, debug_url: "http://127.0.0.1:9257", rps: 1, workers: 1}
+  - {name: acc38, chrome_profile_dir: ./profiles/acc38, debug_url: "http://127.0.0.1:9258", rps: 1, workers: 1}
+  - {name: acc39, chrome_profile_dir: ./profiles/acc39, debug_url: "http://127.0.0.1:9259", rps: 1, workers: 1}
+  - {name: acc40, chrome_profile_dir: ./profiles/acc40, debug_url: "http://127.0.0.1:9260", rps: 1, workers: 1}
 
 # New tokens: Axiom's real-time new_pairs stream (WebSocket), read by a Chrome
 # kept open on axiom.trade. Real time only: tokens launched while the bot is
@@ -83,7 +100,9 @@ axiom:
   cf_clearance: "${CF_CLEARANCE}"
   # Only these protocols (Axiom's "protocol" or "display_protocol"), e.g.
   # ["Pump V1"]. Empty = every protocol. The "axiom stats" log line shows
-  # how many pairs came per protocol.
+  # how many pairs came per protocol. A mint already taken as Pump V1 and
+  # later seen as Pump AMM is a migration: the new pair replaces the curve
+  # even when Pump AMM is not listed here.
   protocols: []
   # These never reach the volume check, the fomo checks or any alert.
   skip_protocols:
@@ -127,16 +146,16 @@ screen:
   proxies: ./proxies.txt
 
 watch:
-  # From the moment the token enters tier 1: 20m + 30m + 1h + 48h.
+  # From the moment the token enters tier 1: 10m + 30m + 1h + 48h.
   lifetime: 49h50m
   # Pair volume is checked only until tier 4, which starts at 1h50m.
   volume_for: 110m
   min_theses: 3                 # alert when the token has this many theses
   thesis_limit: 500             # one sortedThesis page; 500 is the API cap so the window comes back whole
   schedule:                     # age is time since tier 1, not since the token was created
-    - {max_age: 20m, every: 2s}
-    - {max_age: 50m, every: 5s}
-    - {max_age: 110m, every: 30s}
+    - {max_age: 10m, every: 3s}
+    - {max_age: 20m, every: 7s}
+    - {max_age: 60m, every: 30s}
     - {max_age: 49h50m, every: 2m}
   retry_delay: 30s
   auth_pause: 1m                # rest an account after fomo rejected its token

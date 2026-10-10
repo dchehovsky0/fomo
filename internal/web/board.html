@@ -696,7 +696,7 @@ function paint(tr, t) {
   const bases = [t.age_ms, t.left_ms];
   tr.querySelectorAll("[data-tick]").forEach((el, i) => { el.dataset.base = String(bases[i]); });
   const theses = tr.querySelector("[data-theses]");
-  theses.textContent = t.checked ? (t.theses + " / " + (data.need || 0)) : "—";
+  theses.textContent = t.checked ? (t.theses + " / " + (t.need || data.need || 0)) : "—";
   theses.title = t.checked ? "" : "ещё не спрашивали";
   tr.querySelector("[data-every]").textContent = every(t.every_ms);
   const vol = tr.querySelector("[data-vol]");
@@ -849,7 +849,7 @@ function cellTier(t) {
   return td;
 }
 function cellTheses(t) {
-  const td = cell(t.checked ? (t.theses + " / " + (data.need || 0)) : "—");
+  const td = cell(t.checked ? (t.theses + " / " + (t.need || data.need || 0)) : "—");
   td.dataset.theses = "1";
   if (!t.checked) td.title = "ещё не спрашивали";
   return td;
@@ -883,7 +883,7 @@ function renderNote() {
   }
   const n = data && data.need;
   document.getElementById("note").textContent = n
-    ? "Алерт уходит, когда тезисов становится " + n + ". Объём пары на Axiom за 1 час и за 5 минут обновляется, пока токен в тирах 1–3; фильтр идёт по 5 минутам. Наведите на цифру — сделки, время замера и объём на входе. Крестик снимает токен: опросы fomo и объёма по нему останавливаются."
+    ? "Первый алерт — когда тезисов становится " + n + ", дальше на каждом удвоении. Дробь у токена — сколько сейчас и какой следующий порог. Объём пары на Axiom за 1 час и за 5 минут обновляется, пока токен в тирах 1–3; фильтр идёт по 5 минутам. Наведите на цифру — сделки, время замера и объём на входе. Крестик снимает токен: опросы fomo и объёма по нему останавливаются."
     : "";
 }
 function rangeMs() { return ranges[document.getElementById("range").value] || 0; }
@@ -1121,6 +1121,7 @@ function tokenCell(a) {
   sub.textContent = a.name || shortMint(a.mint);
   sub.addEventListener("click", () => openToken(a.id));
   if (a.dex) sub.textContent += " · " + a.dex;
+  if (a.doubled) sub.textContent += " · x2";
   if (a.kind === "trending") sub.textContent += " · trending";
   const addr = document.createElement("div");
   addr.className = "sub";
