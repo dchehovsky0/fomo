@@ -18,7 +18,11 @@ import (
 	"fomobot/internal/session"
 )
 
-const pairStatsURL = "https://api7.axiom.trade/pair-stats-v4"
+const (
+	pairStatsURL = "https://api7.axiom.trade/pair-stats-v4"
+	// tokenInfoURL is Global fees paid for one pool. pairAddress is the pool.
+	tokenInfoURL = "https://api.axiom.trade/token-info-v2"
+)
 
 // One pair-stats read at a time. Parallel reads from one window reached
 // HTTP 429 within a minute, and the real ceiling is not published.
@@ -299,7 +303,7 @@ func (c *StatsPage) statsBatch(ctx context.Context, asks []Ask) (map[string]doma
 		}
 		return map[string]domain.Volume{}, failed, errPageClosed
 	}
-	rows, err := evalStats(ctx, page, ready)
+	rows, err := evalRows(ctx, page, statsScript, pairStatsURL, ready)
 	if err != nil {
 		if !strings.Contains(err.Error(), "not open") {
 			c.slow(err.Error())
@@ -341,16 +345,17 @@ type pageRow struct {
 	Error  string `json:"error"`
 }
 
-func evalStats(ctx, page context.Context, asks []Ask) ([]pageRow, error) {
+// evalRows runs script in the stats tab against url for each ask.
+func evalRows(ctx, page context.Context, script, url string, asks []Ask) ([]pageRow, error) {
 	payload, err := json.Marshal(asks)
 	if err != nil {
 		return nil, err
 	}
-	base, err := json.Marshal(pairStatsURL + "?pairAddress=")
+	base, err := json.Marshal(url + "?pairAddress=")
 	if err != nil {
 		return nil, err
 	}
-	script := fmt.Sprintf(statsScript, payload, base)
+	script = fmt.Sprintf(script, payload, base)
 	runCtx, cancel := context.WithTimeout(page, 20*time.Second)
 	defer cancel()
 	stop := context.AfterFunc(ctx, cancel)
@@ -445,4 +450,77 @@ func window(ws [][]float64, i int) (usd float64, trades int) {
 	}
 	w := ws[i]
 	return w[2] + w[3], int(w[0] + w[1])
+}
+
+// Fee reads Global fees paid, in SOL, for one pool from the stats window.
+// It shares the volume lane: one read at a time, on the same pause.
+// A 200 without totalPairFeesPaid is an error, not zero.
+func (c *StatsPage) Fee(ctx context.Context, pool string) (float64, error) {
+	if strings.TrimSpace(pool) == "" {
+		return 0, errors.New("axiom: no pair")
+	}
+	c.call.Lock()
+	defer c.call.Unlock()
+	c.mu.Lock()
+	open := c.page != nil
+	c.mu.Unlock()
+	if !open {
+		return 0, errPageClosed
+	}
+	if err := c.waitTurn(ctx); err != nil {
+		return 0, err
+	}
+	c.mu.Lock()
+	page := c.page
+	c.mu.Unlock()
+	if page == nil {
+		return 0, errPageClosed
+	}
+	rows, err := evalRows(ctx, page, infoScript, tokenInfoURL, []Ask{{Mint: pool, Pair: pool}})
+	if err != nil {
+		if !strings.Contains(err.Error(), "not open") {
+			c.slow(err.Error())
+		}
+		return 0, err
+	}
+	c.observeRows(rows)
+	if len(rows) != 1 {
+		return 0, errors.New("axiom: no answer")
+	}
+	if rows[0].Error != "" {
+		return 0, fmt.Errorf("axiom: %s", rows[0].Error)
+	}
+	return feeFromBody(rows[0].Status, rows[0].Body)
+}
+
+// v is a cache buster, the same kind of unix-ms query the site sends.
+const infoScript = `(async () => {
+  const asks = %s;
+  const base = %s;
+  const out = [];
+  await Promise.all(asks.map(async (a) => {
+    try {
+      const r = await fetch(base + encodeURIComponent(a.pair) + "&v=" + Date.now(), {credentials: "include", signal: AbortSignal.timeout(10000)});
+      out.push({mint: a.mint, status: r.status, body: await r.text()});
+    } catch (e) {
+      out.push({mint: a.mint, error: String(e && e.message || e)});
+    }
+  }));
+  return out;
+})()`
+
+func feeFromBody(status int, body string) (float64, error) {
+	if status != 200 {
+		return 0, fmt.Errorf("axiom: HTTP %d", status)
+	}
+	var raw struct {
+		TotalPairFeesPaid *float64 `json:"totalPairFeesPaid"`
+	}
+	if err := json.Unmarshal([]byte(body), &raw); err != nil {
+		return 0, fmt.Errorf("axiom: decode: %w", err)
+	}
+	if raw.TotalPairFeesPaid == nil {
+		return 0, errors.New("axiom: no totalPairFeesPaid")
+	}
+	return *raw.TotalPairFeesPaid, nil
 }

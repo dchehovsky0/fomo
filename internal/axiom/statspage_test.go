@@ -2,6 +2,7 @@ package axiom
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -120,5 +121,40 @@ func TestVolumesFromRows(t *testing.T) {
 	}
 	if len(failed) != 3 || err == nil {
 		t.Fatalf("failed=%v err=%v", failed, err)
+	}
+}
+
+func TestFeeFromBody(t *testing.T) {
+	body := `{"top10HoldersPercent":25.8,"numHolders":379,"dexPaid":true,"totalPairFeesPaid":10.0494433011617}`
+	for _, c := range []struct {
+		status int
+		body   string
+		sol    float64
+		ok     bool
+	}{
+		{200, body, 10.0494433011617, true},
+		{200, `{"totalPairFeesPaid":0}`, 0, true},
+		{200, `{"totalPairFeesPaid":1}`, 1, true},
+		{200, `{"numHolders":379}`, 0, false},
+		{200, `{"totalPairFeesPaid":null}`, 0, false},
+		{401, `{"error":"Session invalid"}`, 0, false},
+		{200, "<html>", 0, false},
+	} {
+		sol, err := feeFromBody(c.status, c.body)
+		if (err == nil) != c.ok || sol != c.sol {
+			t.Fatalf("%d %s = %v %v", c.status, c.body, sol, err)
+		}
+	}
+}
+
+func TestClosedPageFeeDoesNotPace(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	page, err := NewStatsPage(Config{Chrome: session.ChromeOptions{ProfileDir: t.TempDir()}}, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if _, err := page.Fee(context.Background(), "pool"); !errors.Is(err, errPageClosed) || time.Since(start) > 150*time.Millisecond {
+		t.Fatalf("err=%v after %s", err, time.Since(start))
 	}
 }

@@ -14,8 +14,8 @@ import (
 
 // Board is the watch list as the operator's page shows it. Tier comes from
 // the schedule and the time since the token entered tier 1, the same clock
-// the checks use. A thesis alert leaves the token here. Dropped and expired
-// tokens are gone from the list.
+// the checks use. A thesis alert leaves the token here. Dropped, expired
+// and no-thesis tokens are gone from the list.
 type Board struct {
 	AsOf     time.Time    `json:"as_of"`
 	Need     int          `json:"need"`

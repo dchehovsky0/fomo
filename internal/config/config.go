@@ -94,7 +94,7 @@ type Axiom struct {
 // Proxies is a file of socks5://user:pass@host:port lines assigned to fomo
 // accounts that do not set one. The volume check does not use them: it runs
 // in the axiom stats window (axiom.stats_profile_dir).
-// Recheck samples the volume again while the token is in tiers 1–3. Three
+// Recheck samples the volume again while the token is inside the volume window. Three
 // samples in a row under MinVolume5m drop the token. See TOKEN_TIERS.md.
 type Screen struct {
 	After       time.Duration `yaml:"after"`
@@ -103,7 +103,11 @@ type Screen struct {
 	// NoVolumeFor: a pair that still has no trades this long after creation
 	// is dropped on that answer. Axiom not answering is not that.
 	NoVolumeFor time.Duration `yaml:"no_volume_for"`
-	Proxies     string        `yaml:"proxies"`
+	// MinFeesSOL: a Pump AMM pool must have paid more than this many SOL in
+	// Global fees (token-info-v2 totalPairFeesPaid) once, after volume clears.
+	// The pair address is the pool. Zero turns the check off. Pump V1 is not asked.
+	MinFeesSOL float64 `yaml:"min_fees_sol"`
+	Proxies    string  `yaml:"proxies"`
 }
 
 type Watch struct {
@@ -113,7 +117,10 @@ type Watch struct {
 	VolumeFor time.Duration `yaml:"volume_for"`
 	// MinTheses is the first alert. The token stays watched; later alerts
 	// go out at twice, four times, eight times this count. See TOKEN_TIERS.md.
-	MinTheses   int           `yaml:"min_theses"`
+	MinTheses int `yaml:"min_theses"`
+	// NoThesisFor: a token still at 0 theses this long after entering tier 1
+	// is removed for good. A fomo error is not a zero. Zero turns the rule off.
+	NoThesisFor time.Duration `yaml:"no_thesis_for"`
 	ThesisLimit int           `yaml:"thesis_limit"`
 	Schedule    []WatchTier   `yaml:"schedule"`
 	RetryDelay  time.Duration `yaml:"retry_delay"`
@@ -268,12 +275,14 @@ func Default() Config {
 			MinVolume5m: 5_000,
 			Recheck:     30 * time.Second,
 			NoVolumeFor: 2 * time.Minute,
+			MinFeesSOL:  1,
 			Proxies:     "./proxies.txt",
 		},
 		Watch: Watch{
 			Lifetime:    49*time.Hour + 50*time.Minute,
 			VolumeFor:   110 * time.Minute,
 			MinTheses:   3,
+			NoThesisFor: 25 * time.Minute,
 			ThesisLimit: 500,
 			Schedule: []WatchTier{
 				{MaxAge: 10 * time.Minute, Every: 3 * time.Second},
@@ -522,6 +531,9 @@ func (c *Config) Validate() error {
 	if ax.StallTimeout <= 0 || ax.StartTimeout <= 0 {
 		errs = append(errs, errors.New("axiom.stall_timeout and start_timeout must be > 0"))
 	}
+	if c.Screen.MinFeesSOL < 0 {
+		errs = append(errs, errors.New("screen.min_fees_sol must be >= 0"))
+	}
 
 	w := &c.Watch
 	if w.Lifetime <= 0 {
@@ -529,6 +541,9 @@ func (c *Config) Validate() error {
 	}
 	if w.MinTheses < 1 {
 		errs = append(errs, errors.New("watch.min_theses must be >= 1"))
+	}
+	if w.NoThesisFor < 0 {
+		errs = append(errs, errors.New("watch.no_thesis_for must be >= 0"))
 	}
 	if w.ThesisLimit < w.MinTheses {
 		w.ThesisLimit = max(w.MinTheses, 500)

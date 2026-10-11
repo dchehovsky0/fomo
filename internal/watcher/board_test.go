@@ -32,9 +32,9 @@ func TestPickImageUsesAxiomWhenNoneWasStored(t *testing.T) {
 
 func prodSchedule() []Tier {
 	return []Tier{
-		{MaxAge: 20 * time.Minute, Every: 2 * time.Second},
-		{MaxAge: 50 * time.Minute, Every: 5 * time.Second},
-		{MaxAge: 110 * time.Minute, Every: 30 * time.Second},
+		{MaxAge: 10 * time.Minute, Every: 3 * time.Second},
+		{MaxAge: 20 * time.Minute, Every: 7 * time.Second},
+		{MaxAge: 60 * time.Minute, Every: 30 * time.Second},
 		{MaxAge: 49*time.Hour + 50*time.Minute, Every: 2 * time.Minute},
 	}
 }
@@ -56,8 +56,8 @@ func TestBoardGroupsByTheSchedule(t *testing.T) {
 	if empty.Watching != 0 || len(empty.Tokens) != 0 || len(empty.Tiers) != 4 {
 		t.Fatalf("empty board: %+v", empty)
 	}
-	if got := time.Duration(empty.Tiers[3].LastsMS) * time.Millisecond; got != 48*time.Hour {
-		t.Fatalf("tier 4 lasts %s, want 48h", got)
+	if got := time.Duration(empty.Tiers[3].LastsMS) * time.Millisecond; got != 48*time.Hour+50*time.Minute {
+		t.Fatalf("tier 4 lasts %s, want 48h50m", got)
 	}
 
 	put := func(mint string, age, due time.Duration) *item {
@@ -70,8 +70,8 @@ func TestBoardGroupsByTheSchedule(t *testing.T) {
 		return it
 	}
 	fresh := put("fresh", 4*time.Minute, 1500*time.Millisecond)
-	put("mid", 25*time.Minute, -5*time.Second)
-	older := put("older", 60*time.Minute, 20*time.Second)
+	put("mid", 15*time.Minute, -5*time.Second)
+	older := put("older", 40*time.Minute, 20*time.Second)
 	put("late", 3*time.Hour, time.Minute)
 	w.publishCount(fresh, 2)
 	w.noteFomo(fresh, 60*time.Second+188*time.Millisecond)
@@ -91,7 +91,7 @@ func TestBoardGroupsByTheSchedule(t *testing.T) {
 		t.Fatalf("order: %+v", b.Tokens)
 	}
 	f := b.Tokens[0]
-	if f.Tier != 1 || f.AgeMS != (4*time.Minute).Milliseconds() || f.LeftMS != (16*time.Minute).Milliseconds() || f.EveryMS != 2000 {
+	if f.Tier != 1 || f.AgeMS != (4*time.Minute).Milliseconds() || f.LeftMS != (6*time.Minute).Milliseconds() || f.EveryMS != 3000 {
 		t.Fatalf("fresh: %+v", f)
 	}
 	if !f.Checked || f.Theses != 2 || f.Checks != 1 || f.NextMS != 1500 || f.FomoMS != 60188 {
@@ -100,7 +100,7 @@ func TestBoardGroupsByTheSchedule(t *testing.T) {
 	if b.Tokens[1].Tier != 2 || b.Tokens[1].Checked || b.Tokens[1].NextMS != -5000 {
 		t.Fatalf("mid: %+v", b.Tokens[1])
 	}
-	if b.Tokens[2].Tier != 3 || b.Tokens[2].FailKind != "error" || b.Tokens[2].LeftMS != (50*time.Minute).Milliseconds() {
+	if b.Tokens[2].Tier != 3 || b.Tokens[2].FailKind != "error" || b.Tokens[2].LeftMS != (20*time.Minute).Milliseconds() {
 		t.Fatalf("older: %+v", b.Tokens[2])
 	}
 	if b.Tokens[3].Tier != 4 || b.Tokens[3].EveryMS != (2*time.Minute).Milliseconds() {

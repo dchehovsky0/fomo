@@ -876,6 +876,184 @@ func TestHandReleaseIsNotBroughtBackByMigration(t *testing.T) {
 	}
 }
 
+func TestNoThesisRemovesForGood(t *testing.T) {
+	st, _ := store.Open("")
+	book := &memTiers{}
+	base := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	var now atomic.Int64
+	now.Store(base.UnixNano())
+	f := &fakeFomo{counts: map[string]int{"M": 0}}
+	cfg := testConfig()
+	cfg.NoThesisFor = 25 * time.Minute
+	cfg.Lifetime = 50 * time.Hour
+	w := New(cfg, []Account{{Name: "a", Client: f}}, &fakeNotifier{}, st, quiet())
+	w.SetTiers(book)
+	w.now = func() time.Time { return time.Unix(0, now.Load()).UTC() }
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: base})
+
+	now.Store(base.Add(24 * time.Minute).UnixNano())
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err != nil {
+		t.Fatal(err)
+	}
+	if w.Watching() != 1 || w.Quiet("M") {
+		t.Fatal("24m with 0 theses must stay on the list")
+	}
+
+	now.Store(base.Add(25 * time.Minute).UnixNano())
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err != nil {
+		t.Fatal(err)
+	}
+	if w.Watching() != 0 || !w.Quiet("M") || w.Stats.NoThesis.Load() != 1 {
+		t.Fatalf("watching %d quiet %v removed %d", w.Watching(), w.Quiet("M"), w.Stats.NoThesis.Load())
+	}
+	if _, _, status := book.snapshot(); status != "no_thesis" {
+		t.Fatalf("status = %s", status)
+	}
+	if w.Release("M") {
+		t.Fatal("a volume drop must not rewrite a token already removed for no theses")
+	}
+	if _, _, status := book.snapshot(); status != "no_thesis" {
+		t.Fatalf("status after release = %s", status)
+	}
+	if w.ReopenDropped("M") {
+		t.Fatal("a no-thesis removal must not reopen like a volume drop")
+	}
+	w.Add(domain.Token{Mint: "M", Symbol: "S", Dex: "Pump AMM", Pool: "amm", CreatedAt: base})
+	if w.Watching() != 0 {
+		t.Fatal("migration put the token back")
+	}
+
+	w.mu.Lock()
+	delete(w.quiet, "M")
+	w.mu.Unlock()
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: base})
+	if w.Watching() != 0 {
+		t.Fatal("a stored no-thesis row must not be watched again")
+	}
+}
+
+func TestNoThesisClockStartsAtTier1(t *testing.T) {
+	st, _ := store.Open("")
+	base := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	var now atomic.Int64
+	now.Store(base.UnixNano())
+	f := &fakeFomo{counts: map[string]int{"M": 0}}
+	cfg := testConfig()
+	cfg.NoThesisFor = 25 * time.Minute
+	cfg.Lifetime = 50 * time.Hour
+	w := New(cfg, []Account{{Name: "a", Client: f}}, &fakeNotifier{}, st, quiet())
+	w.now = func() time.Time { return time.Unix(0, now.Load()).UTC() }
+	// Created long ago; the 25 minutes start when watching starts.
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: base.Add(-2 * time.Hour)})
+
+	now.Store(base.Add(time.Minute).UnixNano())
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err != nil {
+		t.Fatal(err)
+	}
+	if w.Watching() != 1 || w.Quiet("M") {
+		t.Fatal("token age must not spend the 25 minutes")
+	}
+}
+
+func TestStoredAlertIsNotRemovedForSilence(t *testing.T) {
+	st, _ := store.Open("")
+	base := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	if err := st.MarkSignaled(store.Signal{Token: "M", Ticker: "S", Count: 3, Threshold: 3, SentAt: base}); err != nil {
+		t.Fatal(err)
+	}
+	var now atomic.Int64
+	now.Store(base.UnixNano())
+	f := &fakeFomo{counts: map[string]int{"M": 0}}
+	cfg := testConfig()
+	cfg.NoThesisFor = 25 * time.Minute
+	cfg.Lifetime = 50 * time.Hour
+	w := New(cfg, []Account{{Name: "a", Client: f}}, &fakeNotifier{}, st, quiet())
+	w.now = func() time.Time { return time.Unix(0, now.Load()).UTC() }
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: base})
+
+	now.Store(base.Add(40 * time.Minute).UnixNano())
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err != nil {
+		t.Fatal(err)
+	}
+	if w.Watching() != 1 || w.Quiet("M") {
+		t.Fatal("a token that already alerted must stay when a later answer is empty")
+	}
+}
+
+func TestNoThesisWaitsForARealAnswer(t *testing.T) {
+	st, _ := store.Open("")
+	book := &memTiers{}
+	base := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	var now atomic.Int64
+	now.Store(base.UnixNano())
+	f := &fakeFomo{counts: map[string]int{"M": 0}, err: errors.New("fomo down")}
+	cfg := testConfig()
+	cfg.NoThesisFor = 25 * time.Minute
+	cfg.Lifetime = 50 * time.Hour
+	w := New(cfg, []Account{{Name: "a", Client: f}}, &fakeNotifier{}, st, quiet())
+	w.SetTiers(book)
+	w.now = func() time.Time { return time.Unix(0, now.Load()).UTC() }
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: base})
+
+	now.Store(base.Add(30 * time.Minute).UnixNano())
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err == nil {
+		t.Fatal("expected the fomo error")
+	}
+	if w.Watching() != 1 || w.Quiet("M") {
+		t.Fatal("a fomo error must not count as zero theses")
+	}
+	if _, _, status := book.snapshot(); status != "watching" {
+		t.Fatalf("status = %s", status)
+	}
+
+	f.err = nil
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err != nil {
+		t.Fatal(err)
+	}
+	if w.Watching() != 0 || !w.Quiet("M") {
+		t.Fatal("the first empty answer after 25m must remove the token")
+	}
+	if _, _, status := book.snapshot(); status != "no_thesis" {
+		t.Fatalf("status = %s", status)
+	}
+}
+
+func TestOneThesisIsNotRemovedForSilence(t *testing.T) {
+	st, _ := store.Open("")
+	book := &memTiers{}
+	base := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	var now atomic.Int64
+	now.Store(base.UnixNano())
+	f := &fakeFomo{counts: map[string]int{"M": 1}}
+	cfg := testConfig()
+	cfg.NoThesisFor = 25 * time.Minute
+	cfg.Lifetime = 50 * time.Hour
+	w := New(cfg, []Account{{Name: "a", Client: f}}, &fakeNotifier{}, st, quiet())
+	w.SetTiers(book)
+	w.now = func() time.Time { return time.Unix(0, now.Load()).UTC() }
+	w.Add(domain.Token{Mint: "M", Symbol: "S", CreatedAt: base})
+
+	now.Store(base.Add(30 * time.Minute).UnixNano())
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err != nil {
+		t.Fatal(err)
+	}
+	if w.Watching() != 1 || w.Quiet("M") {
+		t.Fatal("one thesis must keep the token past 25m")
+	}
+
+	f.set("M", 0)
+	now.Store(base.Add(40 * time.Minute).UnixNano())
+	if _, err := w.check(context.Background(), 0, w.items["M"]); err != nil {
+		t.Fatal(err)
+	}
+	if w.Watching() != 1 || w.Quiet("M") {
+		t.Fatal("an empty answer after a thesis must not remove the token")
+	}
+	if _, _, status := book.snapshot(); status != "watching" {
+		t.Fatalf("status = %s", status)
+	}
+}
+
 func TestFailedSendIsRecordedInTheGap(t *testing.T) {
 	f := &fakeFomo{counts: map[string]int{"M": 3}}
 	n := &fakeNotifier{}

@@ -2,10 +2,19 @@
 // for the pair's trading volume over the last 5 minutes. At or below
 // MinVolume5m the token never reaches the fomo checks. A pair with no volume
 // yet is asked again until NoVolumeFor after creation; the first empty answer
-// at or past it drops the token. While the token is in tiers 1–3, the
-// 5-minute volume is asked again on its own clock. The first sample waits one
-// Recheck after the token enters the book. Three samples in a row under
-// MinVolume5m drop it. Tier 4 is not checked.
+// at or past it drops the token. While the token is still inside the volume
+// window, the 5-minute volume is asked again on its own clock. The first
+// sample waits one Recheck after the token enters the book. Three samples in
+// a row under MinVolume5m drop it. Past that window it is not checked.
+//
+// A Pump AMM pair that clears the volume floor is asked once for Global fees
+// paid. The pair address is the pool. Above MinFeesSOL the token enters the
+// book; at or below it, the token is dropped. That answer is not asked again
+// on tier rechecks. A request Axiom did not answer is asked again and does
+// not read the volume a second time. A token already in the book that moves
+// onto a Pump AMM pair is asked once on the same queue, in any tier; at or
+// below MinFeesSOL it is released. Pump V1 is not asked. MinFeesSOL of zero
+// turns the check off.
 //
 // Asks go out one token at a time. Among asks already due, the one that has
 // been waiting longest goes first, whether it is the first ask, a retry or a
@@ -17,6 +26,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,12 +40,15 @@ import (
 type Querier interface {
 	Limit() int
 	Wave(ctx context.Context, tokens []domain.Token) (vols map[string]domain.Volume, failed []string, err error)
+	// Fee reads Global fees paid, in SOL, for the token's pool. An error is
+	// not zero.
+	Fee(ctx context.Context, tok domain.Token) (float64, error)
 }
 
 type Config struct {
 	After time.Duration
 	// MinVolume5m is the USD volume over the last 5 minutes a token must
-	// exceed to enter tier 1, and must keep reaching while in tiers 1–3.
+	// exceed to enter tier 1, and must keep reaching while volume is still checked.
 	MinVolume5m float64
 	Retry       time.Duration
 	Recheck     time.Duration
@@ -43,6 +56,9 @@ type Config struct {
 	// volume. An empty answer at or past it drops the token. A request Axiom
 	// did not answer is not an empty answer.
 	NoVolumeFor time.Duration
+	// MinFeesSOL is the Global fees paid, in SOL, a Pump AMM pool must exceed
+	// once. One SOL exactly does not pass. Zero turns the check off.
+	MinFeesSOL float64
 }
 
 type Gate struct {
@@ -60,6 +76,9 @@ type Gate struct {
 	dexOrd   []string
 	dexSum   Health
 	vol      map[string]*volTrack
+	// feeOK is the fee answer per mint: true above MinFeesSOL. A mint has
+	// one Pump AMM pair at most, since it migrates once.
+	feeOK map[string]bool
 	// closedUntil holds the lane when the stats window is not open yet.
 	// Reads in that stretch are not attempts and are not paced.
 	closedUntil time.Time
@@ -87,6 +106,11 @@ type item struct {
 	// born is the creation time, or when the token was added if the launch
 	// had none or it was in the future. NoVolumeFor counts from here.
 	born time.Time
+	// feesOnly means the next ask is Global fees for this pool. held is the
+	// volume that cleared. inBook is a watched token that moved onto the pool.
+	feesOnly bool
+	inBook   bool
+	held     domain.Volume
 }
 
 // How many screened tokens the health report keeps, newest last in storage.
@@ -159,6 +183,7 @@ func New(cfg Config, q Querier, log *slog.Logger) *Gate {
 		cfg: cfg, q: q, log: log, now: time.Now, pending: map[string]*item{},
 		migrated: map[string]domain.Token{},
 		dex:      map[string]*volState{}, vol: map[string]*volTrack{},
+		feeOK:  map[string]bool{},
 		dexSum: Health{VolumeFromRequest: map[int]int{}},
 	}
 }
@@ -226,6 +251,11 @@ func (g *Gate) ScreenPair(token domain.Token) {
 	now := g.now()
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	// The curve read in flight already reached a fee answer for this pair.
+	// Screening again would undo it.
+	if _, decided := g.feeOK[token.Mint]; decided {
+		return
+	}
 	if _, ok := g.pending[token.Mint]; ok {
 		return
 	}
@@ -247,12 +277,17 @@ func (g *Gate) ScreenPair(token domain.Token) {
 
 // ResetStreak forgets volume samples that belong to the pair the token left.
 // The next recheck is due immediately and reads whatever pair the book has now.
+// A watched token that moved onto Pump AMM is queued for its one fee read.
 func (g *Gate) ResetStreak(mint string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	now := g.now()
+	if next, ok := g.migrated[mint]; ok && g.feeRequired(next) {
+		g.pending[mint] = &item{token: next, due: now, born: now, feesOnly: true, inBook: true}
+	}
 	tr := g.vol[mint]
 	if tr == nil {
-		g.vol[mint] = &volTrack{next: g.now()}
+		g.vol[mint] = &volTrack{next: now}
 		return
 	}
 	tr.gen++
@@ -261,7 +296,7 @@ func (g *Gate) ResetStreak(mint string) {
 	tr.flat = 0
 	tr.last = 0
 	tr.seen = false
-	tr.next = g.now()
+	tr.next = now
 }
 
 // Run asks for one due token at a time and emits those whose volume clears
@@ -278,7 +313,7 @@ func (g *Gate) Run(ctx context.Context, emit func(domain.Token), book Book) {
 		it, tok, ok := g.next(g.now(), book)
 		switch {
 		case it != nil:
-			g.ask(ctx, []*item{it}, emit)
+			g.ask(ctx, []*item{it}, emit, book)
 		case ok:
 			g.recheckOne(ctx, book, tok)
 		default:
@@ -290,7 +325,7 @@ func (g *Gate) Run(ctx context.Context, emit func(domain.Token), book Book) {
 }
 
 // next takes the ask that has been due the longest: a first check, a retry,
-// or a tier 1–3 recheck. A recheck does not wait for the entry queue to
+// or a volume recheck. A recheck does not wait for the entry queue to
 // empty; when both are due at the same moment the entry queue goes first.
 func (g *Gate) next(now time.Time, book Book) (*item, domain.Token, bool) {
 	var tok domain.Token
@@ -340,7 +375,7 @@ func (g *Gate) oldestDue(now time.Time) *item {
 	return best
 }
 
-// takeRecheck picks one tier 1–3 token whose own recheck time has arrived
+// takeRecheck picks one watched token whose own recheck time has arrived
 // and reserves the next sample.
 func (g *Gate) takeRecheck(now time.Time, book Book) (domain.Token, bool) {
 	tok, _, ok := g.dueRecheck(now, book)
@@ -353,7 +388,7 @@ func (g *Gate) takeRecheck(now time.Time, book Book) (domain.Token, bool) {
 	return tok, true
 }
 
-// dueRecheck finds the tier 1–3 token whose recheck has been due the longest
+// dueRecheck finds the watched token whose recheck has been due the longest
 // and when it fell due. It does not reserve the sample. A token just admitted
 // to the book waits one full Recheck before its first sample, so the
 // admission read is not repeated.
@@ -436,13 +471,27 @@ func (g *Gate) wave(ctx context.Context, emit func(domain.Token)) {
 		}
 	}
 	g.mu.Unlock()
-	g.ask(ctx, batch, emit)
+	g.ask(ctx, batch, emit, nil)
 }
 
-func (g *Gate) ask(ctx context.Context, batch []*item, emit func(domain.Token)) {
+// ask reads volume for the batch, or fees for an item that owes them. book
+// is where a watched token is released when its fees do not clear.
+func (g *Gate) ask(ctx context.Context, batch []*item, emit func(domain.Token), book Book) {
 	if len(batch) == 0 {
 		return
 	}
+	var volume []*item
+	for _, it := range batch {
+		if it.feesOnly {
+			g.askFees(ctx, it, emit, book)
+			continue
+		}
+		volume = append(volume, it)
+	}
+	if len(volume) == 0 {
+		return
+	}
+	batch = volume
 	now := g.now()
 	tokens := make([]domain.Token, len(batch))
 	for i, it := range batch {
@@ -503,6 +552,7 @@ func (g *Gate) ask(ctx context.Context, batch []*item, emit func(domain.Token)) 
 		g.mu.Lock()
 		admitted := g.pairNow(it.token)
 		moved := admitted.Pool != it.token.Pool
+		wantFees := decision == "в работу" && g.feeRequired(admitted)
 		g.mu.Unlock()
 		// A curve answer that does not clear the filter is not retried: the
 		// Pump AMM pair has its own check. A pass admits that pair.
@@ -510,6 +560,15 @@ func (g *Gate) ask(ctx context.Context, batch []*item, emit func(domain.Token)) 
 			g.log.Info("flow", "step", "объём", "decision", "миграция",
 				"why", "ответ кривой не решает",
 				"token", mint, "ticker", it.token.Symbol, "pair", admitted.Pool)
+			continue
+		}
+		if wantFees {
+			g.record(it, att, "", "")
+			g.parkForFees(it, admitted, v)
+			g.log.Info("flow", "step", "комиссии", "decision", "ждём",
+				"why", "объём выше порога, смотрим комиссии один раз",
+				"token", mint, "ticker", it.token.Symbol, "pair", admitted.Pool,
+				"volume_5m", v.USD5m, "trades_5m", v.Trades5m, "volume_1h", v.USD1h)
 			continue
 		}
 		g.record(it, att, decision, why)
@@ -579,19 +638,7 @@ func (g *Gate) record(it *item, att Attempt, decision, why string) {
 		st.sawVolume = true
 		g.dexSum.VolumeFromRequest[att.N]++
 	}
-	if decision != "" && !st.done {
-		st.done = true
-		st.tok.Decision = decision
-		st.tok.Why = why
-		if decision == "в работу" {
-			g.dexSum.Passed++
-		} else {
-			g.dexSum.Dropped++
-		}
-		if !st.sawVolume {
-			g.dexSum.NeverVolume++
-		}
-	}
+	g.noteDecision(st, decision, why)
 	for len(g.dexOrd) > volRecent {
 		old := g.dexOrd[0]
 		delete(g.dex, old)
@@ -629,7 +676,7 @@ func (g *Gate) Health() Health {
 // Book is the set of tokens currently checked on fomo.
 type Book interface {
 	Tokens() []domain.Token
-	// VolumeTokens are the ones still in tiers 1–3.
+	// VolumeTokens are the ones still inside the volume window.
 	VolumeTokens() []domain.Token
 	Release(mint string) bool
 }
@@ -640,7 +687,7 @@ type volumeSink interface {
 	NoteVolume(mint string, v domain.Volume, at time.Time)
 }
 
-// recheck scores every token still in tiers 1–3. Run does not use it:
+// recheck scores every token still inside the volume window. Run does not use it:
 // live traffic goes through recheckOne so the book is not dumped at once.
 // A missing answer is not a sample and does not change either streak.
 func (g *Gate) recheck(ctx context.Context, book Book) {
@@ -732,7 +779,7 @@ func (g *Gate) score(book Book, batch []domain.Token, vols map[string]domain.Vol
 	}
 }
 
-// forgetVolume drops samples for tokens that left tiers 1–3. Release already
+// forgetVolume drops samples for tokens that left the volume window. Release already
 // removes a token dropped for low volume; expiry and an alert do not.
 func (g *Gate) forgetVolume(live []domain.Token) {
 	keep := make(map[string]struct{}, len(live))
@@ -808,13 +855,7 @@ func (g *Gate) dropWatched(book Book, tok domain.Token, v domain.Volume, why str
 		return
 	}
 	g.mu.Unlock()
-	released := false
-	if pr, ok := book.(pairRelease); ok {
-		released = pr.ReleasePair(tok.Mint, tok.Pool)
-	} else {
-		released = book.Release(tok.Mint)
-	}
-	if !released {
+	if !release(book, tok) {
 		g.mu.Lock()
 		if cur := g.vol[tok.Mint]; cur != nil && cur.gen == gen {
 			cur.dropping = false
@@ -833,14 +874,132 @@ func (g *Gate) dropWatched(book Book, tok domain.Token, v domain.Volume, why str
 		"min_volume_5m", g.cfg.MinVolume5m)
 }
 
+// release takes tok off book while the book still watches tok's pool.
+func release(book Book, tok domain.Token) bool {
+	if pr, ok := book.(pairRelease); ok {
+		return pr.ReleasePair(tok.Mint, tok.Pool)
+	}
+	return book != nil && book.Release(tok.Mint)
+}
+
 func (g *Gate) again(it *item, why string) {
 	it.tries++
 	it.due = g.now().Add(g.cfg.Retry)
+	g.restore(it)
+	step := "объём"
+	if it.feesOnly {
+		step = "комиссии"
+	}
+	g.log.Info("flow", "step", step, "decision", "повтор", "why", why,
+		"token", it.token.Mint, "ticker", it.token.Symbol, "try", it.tries, "next", g.cfg.Retry.Round(time.Second))
+}
+
+// parkForFees queues the token for its one Global-fees read, carrying the
+// volume that cleared the floor.
+func (g *Gate) parkForFees(it *item, tok domain.Token, v domain.Volume) {
+	it.token = tok
+	it.held = v
+	it.feesOnly = true
+	it.due = g.now()
+	g.restore(it)
+}
+
+// restore puts it back on the queue. A fee read replaces a volume screen
+// queued for the same mint meanwhile: the volume already cleared.
+func (g *Gate) restore(it *item) {
 	g.mu.Lock()
-	if _, ok := g.pending[it.token.Mint]; !ok {
+	defer g.mu.Unlock()
+	if _, ok := g.pending[it.token.Mint]; !ok || it.feesOnly {
 		g.pending[it.token.Mint] = it
 	}
+}
+
+// askFees reads Global fees once for a Pump AMM pool. A new token above
+// MinFeesSOL is emitted with the volume that cleared; at or below it, it is
+// dropped. A watched token at or below it is released from book. A request
+// Axiom did not answer stays queued and does not read the volume again.
+func (g *Gate) askFees(ctx context.Context, it *item, emit func(domain.Token), book Book) {
+	tok := it.token
+	sol, err := g.q.Fee(ctx, tok)
+	if ctx.Err() != nil {
+		g.restore(it)
+		return
+	}
+	if pageClosed(err) {
+		g.blockFor(time.Second)
+		g.log.Warn("axiom fees", "token", tok.Mint, "err", err)
+		g.restore(it)
+		return
+	}
+	if err != nil {
+		g.log.Warn("axiom fees", "token", tok.Mint, "err", err)
+		g.again(it, "axiom не ответил")
+		return
+	}
+	pass := sol > g.cfg.MinFeesSOL
+	why := feesWhy(g.cfg.MinFeesSOL, pass)
+	decision := "пропуск"
+	if pass {
+		decision = "в работу"
+	}
+	g.mu.Lock()
+	g.feeOK[tok.Mint] = pass
+	// A screen queued for this pair while the read was in flight is answered.
+	delete(g.pending, tok.Mint)
+	if st := g.dex[tok.Mint]; st != nil && !it.inBook {
+		g.noteDecision(st, decision, why)
+	}
 	g.mu.Unlock()
-	g.log.Info("flow", "step", "объём", "decision", "повтор", "why", why,
-		"token", it.token.Mint, "ticker", it.token.Symbol, "try", it.tries, "next", g.cfg.Retry.Round(time.Second))
+	if it.inBook {
+		decision = "в работе"
+		if !pass {
+			if !release(book, tok) {
+				return
+			}
+			decision = "снят"
+		}
+	}
+	g.log.Info("flow", "step", "комиссии", "decision", decision, "why", why,
+		"token", tok.Mint, "ticker", tok.Symbol, "pair", tok.Pool,
+		"fees_sol", sol, "min_fees_sol", g.cfg.MinFeesSOL)
+	if pass && !it.inBook {
+		tok.EntryVolume = it.held
+		emit(tok)
+	}
+}
+
+// feeRequired is true for a Pump AMM pair whose fees have not cleared yet.
+// g.mu must be held.
+func (g *Gate) feeRequired(tok domain.Token) bool {
+	return g.cfg.MinFeesSOL > 0 && pumpAMM(tok.Dex) && !g.feeOK[tok.Mint]
+}
+
+// noteDecision closes a screened token. g.mu must be held.
+func (g *Gate) noteDecision(st *volState, decision, why string) {
+	if decision == "" || st.done {
+		return
+	}
+	st.done = true
+	st.tok.Decision = decision
+	st.tok.Why = why
+	if decision == "в работу" {
+		g.dexSum.Passed++
+	} else {
+		g.dexSum.Dropped++
+	}
+	if !st.sawVolume {
+		g.dexSum.NeverVolume++
+	}
+}
+
+func feesWhy(min float64, pass bool) string {
+	n := strconv.FormatFloat(min, 'f', -1, 64)
+	if pass {
+		return "комиссии выше " + n + " SOL"
+	}
+	return "комиссии не выше " + n + " SOL"
+}
+
+func pumpAMM(dex string) bool {
+	return strings.EqualFold(strings.TrimSpace(dex), "Pump AMM")
 }

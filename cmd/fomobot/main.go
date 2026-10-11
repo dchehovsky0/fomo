@@ -161,6 +161,7 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 		Lifetime:    cfg.Watch.Lifetime,
 		VolumeFor:   cfg.Watch.VolumeFor,
 		MinTheses:   cfg.Watch.MinTheses,
+		NoThesisFor: cfg.Watch.NoThesisFor,
 		ThesisLimit: cfg.Watch.ThesisLimit,
 		RetryDelay:  cfg.Watch.RetryDelay,
 		AuthPause:   cfg.Watch.AuthPause,
@@ -226,7 +227,8 @@ func runBot(ctx context.Context, cfg config.Config, log *slog.Logger, dryRun boo
 		protocols = strings.Join(cfg.Axiom.Protocols, ",")
 	}
 	log.Info("fomo thesis bot started",
-		"lifetime", cfg.Watch.Lifetime, "min_theses", cfg.Watch.MinTheses, "protocols", protocols,
+		"lifetime", cfg.Watch.Lifetime, "min_theses", cfg.Watch.MinTheses,
+		"no_thesis_for", cfg.Watch.NoThesisFor, "protocols", protocols,
 		"skip_protocols", strings.Join(cfg.Axiom.SkipProtocols, ","),
 		"accounts", len(watched), "capacity_rps", capacity, "session", cfg.Session.Mode,
 		"trending_alerts", cfg.Trending.Enabled, "signaled_tokens", st.Signals(), "dry_run", dryRun)
@@ -294,6 +296,7 @@ func reportStats(ctx context.Context, src *launches.Source, ax *axiom.Stream, w 
 			"overdue", snap.Overdue, "avg_lag", snap.AvgLag.Round(time.Second), "max_lag", snap.MaxLag.Round(time.Second),
 			"checks", ws.Checks.Load(), "check_errors", ws.Errors.Load(), "signals", ws.Signals.Load(),
 			"send_errors", ws.SendErrors.Load(), "expired", ws.Expired.Load(),
+			"no_thesis", ws.NoThesis.Load(),
 			"avg_check", avgDuration(ws.CheckNanos.Load(), ws.CheckSamples.Load()),
 			"requests", requests, "avg_http", avgDuration(httpNanos, httpSamples),
 			"http_429", limited, "auth_errors", authErrs, "signaled_tokens", st.Signals())
@@ -806,7 +809,8 @@ func newStatsPage(cfg config.Config, log *slog.Logger) (*axiom.StatsPage, error)
 // adoptMigration follows a Pump V1 mint onto its Pump AMM pair.
 // A token still watched keeps its fomo checks; the frozen curve volume
 // cannot take it off the list. A token already dropped for that volume
-// comes back. A token that never cleared the curve is screened on the new pair.
+// comes back. A token removed for zero theses, or taken off the board,
+// does not. A token that never cleared the curve is screened on the new pair.
 func adoptMigration(w *watcher.Watcher, gate *screen.Gate, l domain.Token) {
 	if gate != nil {
 		gate.NoteMigration(l)
@@ -822,7 +826,7 @@ func adoptMigration(w *watcher.Watcher, gate *screen.Gate, l domain.Token) {
 	if gate != nil && gate.RetargetPending(l) {
 		return
 	}
-	if w.Dismissed(l.Mint) {
+	if w.Dismissed(l.Mint) || w.Quiet(l.Mint) {
 		return
 	}
 	if w.ReopenDropped(l.Mint) {
@@ -848,15 +852,17 @@ func newScreen(cfg config.Config, stats *axiom.StatsPage, log *slog.Logger) (*sc
 	}
 	log.Info("volume screen", "requests", "one at a time", "profile", cfg.Axiom.StatsProfileDir,
 		"min_volume_5m", cfg.Screen.MinVolume5m, "recheck", cfg.Screen.Recheck,
-		"after", cfg.Screen.After, "no_volume_for", cfg.Screen.NoVolumeFor)
+		"after", cfg.Screen.After, "no_volume_for", cfg.Screen.NoVolumeFor,
+		"min_fees_sol", cfg.Screen.MinFeesSOL)
 	return screen.New(screen.Config{
 		After: cfg.Screen.After, MinVolume5m: cfg.Screen.MinVolume5m,
 		Recheck:     cfg.Screen.Recheck,
 		NoVolumeFor: cfg.Screen.NoVolumeFor,
+		MinFeesSOL:  cfg.Screen.MinFeesSOL,
 	}, statsWave{stats}, log.With("component", "screen")), nil
 }
 
-// statsWave asks the stats window for pair volume.
+// statsWave asks the stats window for pair volume and Pump AMM fees.
 type statsWave struct{ page *axiom.StatsPage }
 
 func (w statsWave) Limit() int { return w.page.Limit() }
@@ -867,6 +873,10 @@ func (w statsWave) Wave(ctx context.Context, tokens []domain.Token) (map[string]
 		asks[i] = axiom.Ask{Mint: tok.Mint, Pair: tok.Pool}
 	}
 	return w.page.Volumes(ctx, asks)
+}
+
+func (w statsWave) Fee(ctx context.Context, tok domain.Token) (float64, error) {
+	return w.page.Fee(ctx, tok.Pool)
 }
 
 func newAlertInfo(cfg config.Config, checkers []alertinfo.Checker, lookup alertinfo.LaunchLookup, log *slog.Logger) *alertinfo.Builder {

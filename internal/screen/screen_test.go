@@ -14,14 +14,18 @@ import (
 )
 
 type fakeQ struct {
-	mu     sync.Mutex
-	limit  int
-	vols   map[string]domain.Volume
-	failed []string
-	calls  int
-	seq    [][]string
-	pools  []string
-	err    error
+	mu       sync.Mutex
+	limit    int
+	vols     map[string]domain.Volume
+	failed   []string
+	calls    int
+	seq      [][]string
+	pools    []string
+	err      error
+	fees     map[string]float64
+	feeErr   error
+	feeCalls int
+	feePools []string
 }
 
 func (f *fakeQ) Limit() int { return f.limit }
@@ -36,6 +40,21 @@ func (f *fakeQ) Wave(_ context.Context, tokens []domain.Token) (map[string]domai
 	}
 	f.seq = append(f.seq, mints)
 	return f.vols, f.failed, f.err
+}
+
+func (f *fakeQ) Fee(_ context.Context, tok domain.Token) (float64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.feeCalls++
+	f.feePools = append(f.feePools, tok.Pool)
+	if f.feeErr != nil {
+		return 0, f.feeErr
+	}
+	sol, ok := f.fees[tok.Mint]
+	if !ok {
+		return 0, errors.New("axiom: no answer")
+	}
+	return sol, nil
 }
 
 func vol5m(usd float64) domain.Volume {
@@ -576,7 +595,7 @@ func TestInFlightCurveAnswerAdmitsTheNewPair(t *testing.T) {
 	curve := domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now.Add(-time.Minute)}
 	g.NoteMigration(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm"})
 	var got domain.Token
-	g.ask(context.Background(), []*item{{token: curve, born: curve.CreatedAt}}, func(tok domain.Token) { got = tok })
+	g.ask(context.Background(), []*item{{token: curve, born: curve.CreatedAt}}, func(tok domain.Token) { got = tok }, nil)
 	if got.Pool != "amm" || got.Dex != "Pump AMM" || got.EntryVolume.USD5m != 8000 {
 		t.Fatalf("admitted %+v", got)
 	}
@@ -597,7 +616,7 @@ func TestInFlightCurveRefusalDoesNotRetryTheCurve(t *testing.T) {
 	g.NoteMigration(domain.Token{Mint: "R", Dex: "Pump AMM", Pool: "amm"})
 	g.ask(context.Background(), []*item{{token: curve, born: curve.CreatedAt}}, func(domain.Token) {
 		t.Fatal("a curve below the floor admitted the token")
-	})
+	}, nil)
 	g.mu.Lock()
 	_, back := g.pending["R"]
 	g.mu.Unlock()
@@ -628,4 +647,259 @@ func (b *memBook) has(mint string) bool {
 		}
 	}
 	return false
+}
+
+func TestPumpAMMNeedsFeesAboveOneSOL(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{
+		"rich": vol5m(8000), "edge": vol5m(8000), "poor": vol5m(8000), "curve": vol5m(8000), "quiet": vol5m(40),
+	}, fees: map[string]float64{
+		"rich": 10.0494433011617, "edge": 1, "poor": 0.4, "curve": 9,
+	}}
+	g := New(Config{After: time.Second, MinVolume5m: 5000, Retry: time.Second, MinFeesSOL: 1}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	for _, tok := range []domain.Token{
+		{Mint: "rich", Symbol: "R", Dex: "Pump AMM", Pool: "pool-rich", CreatedAt: now.Add(-time.Minute)},
+		{Mint: "edge", Symbol: "E", Dex: "pump amm", Pool: "pool-edge", CreatedAt: now.Add(-time.Minute)},
+		{Mint: "poor", Symbol: "P", Dex: "Pump AMM", Pool: "pool-poor", CreatedAt: now.Add(-time.Minute)},
+		{Mint: "curve", Symbol: "C", Dex: "Pump V1", Pool: "curve", CreatedAt: now.Add(-time.Minute)},
+		{Mint: "quiet", Symbol: "Q", Dex: "Pump AMM", Pool: "pool-quiet", CreatedAt: now.Add(-time.Minute)},
+	} {
+		g.Add(tok)
+	}
+	var got []domain.Token
+	take := func(tok domain.Token) { got = append(got, tok) }
+	g.wave(context.Background(), take)
+	if len(got) != 1 || got[0].Mint != "curve" || got[0].EntryVolume.USD5m != 8000 {
+		t.Fatalf("first wave emitted %+v, want only the curve", got)
+	}
+	if q.feeCalls != 0 {
+		t.Fatalf("fees asked before volume cleared: %d", q.feeCalls)
+	}
+	g.mu.Lock()
+	rich := g.pending["rich"]
+	_, edgeWait := g.pending["edge"]
+	_, poorWait := g.pending["poor"]
+	_, quietWait := g.pending["quiet"]
+	g.mu.Unlock()
+	if rich == nil || !rich.feesOnly || rich.held.USD5m != 8000 || rich.token.Pool != "pool-rich" || !edgeWait || !poorWait || quietWait {
+		t.Fatalf("parked rich=%+v edge=%v poor=%v quiet still pending=%v", rich, edgeWait, poorWait, quietWait)
+	}
+
+	volCalls := q.calls
+	g.wave(context.Background(), take)
+	if len(got) != 2 || got[1].Mint != "rich" || got[1].Pool != "pool-rich" || got[1].EntryVolume.USD5m != 8000 {
+		t.Fatalf("emitted %+v", got)
+	}
+	if q.calls != volCalls {
+		t.Fatalf("volume read again on the fee turn: %d -> %d", volCalls, q.calls)
+	}
+	if q.feeCalls != 3 {
+		t.Fatalf("fee calls %d, want the three pools that cleared volume", q.feeCalls)
+	}
+	for _, pool := range q.feePools {
+		if pool == "curve" || pool == "pool-quiet" {
+			t.Fatalf("fees asked for %s", pool)
+		}
+	}
+	g.mu.Lock()
+	_, richLeft := g.pending["rich"]
+	_, edgeLeft := g.pending["edge"]
+	_, poorLeft := g.pending["poor"]
+	g.mu.Unlock()
+	if richLeft || edgeLeft || poorLeft {
+		t.Fatal("a decided Pump AMM pair stayed pending")
+	}
+
+	book := &memBook{tokens: []domain.Token{{Mint: "rich", Dex: "Pump AMM", Pool: "pool-rich"}}}
+	g.mu.Lock()
+	g.vol["rich"] = &volTrack{next: now}
+	g.mu.Unlock()
+	g.recheckOne(context.Background(), book, book.tokens[0])
+	if q.feeCalls != 3 {
+		t.Fatalf("fees asked again after a pass: %d", q.feeCalls)
+	}
+	if q.calls != volCalls+1 {
+		t.Fatalf("volume recheck calls %d", q.calls)
+	}
+}
+
+func TestPumpAMMFeeErrorRetriesWithoutVolume(t *testing.T) {
+	q := &fakeQ{
+		limit: 10, vols: map[string]domain.Volume{"m": vol5m(8000)},
+		feeErr: errors.New("axiom: HTTP 500"),
+	}
+	g := New(Config{MinVolume5m: 5000, Retry: time.Second, MinFeesSOL: 1}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	g.Add(domain.Token{Mint: "m", Dex: "Pump AMM", Pool: "pool", CreatedAt: now.Add(-time.Minute)})
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("emitted before fees") })
+	if q.calls != 1 || q.feeCalls != 0 {
+		t.Fatalf("calls volume=%d fees=%d", q.calls, q.feeCalls)
+	}
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("emitted on a fee error") })
+	if q.calls != 1 || q.feeCalls != 1 {
+		t.Fatalf("after error volume=%d fees=%d", q.calls, q.feeCalls)
+	}
+	g.mu.Lock()
+	it := g.pending["m"]
+	g.mu.Unlock()
+	if it == nil || !it.feesOnly || it.tries != 1 || it.held.USD5m != 8000 {
+		t.Fatalf("pending %+v", it)
+	}
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("retried before the delay") })
+	if q.feeCalls != 1 {
+		t.Fatalf("fee calls %d", q.feeCalls)
+	}
+	now = now.Add(time.Second)
+	q.feeErr = nil
+	q.fees = map[string]float64{"m": 1.01}
+	var got domain.Token
+	g.wave(context.Background(), func(tok domain.Token) { got = tok })
+	if got.Mint != "m" || got.Pool != "pool" || got.EntryVolume.USD5m != 8000 || q.calls != 1 || len(q.feePools) != 2 || q.feePools[1] != "pool" {
+		t.Fatalf("got %+v volume calls %d pools %v", got, q.calls, q.feePools)
+	}
+}
+
+func TestClosedStatsPageDoesNotBurnTheFeeRetry(t *testing.T) {
+	q := &fakeQ{
+		limit: 10, vols: map[string]domain.Volume{"m": vol5m(8000)},
+		feeErr: errors.New("axiom stats page is not open"),
+	}
+	g := New(Config{MinVolume5m: 5000, Retry: 30 * time.Second, MinFeesSOL: 1}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	g.Add(domain.Token{Mint: "m", Dex: "Pump AMM", Pool: "pool", CreatedAt: now.Add(-time.Minute)})
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("emitted") })
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("emitted") })
+	g.mu.Lock()
+	it := g.pending["m"]
+	paused := g.closedUntil
+	g.mu.Unlock()
+	if it == nil || !it.feesOnly || it.tries != 0 {
+		t.Fatalf("pending %+v", it)
+	}
+	if !paused.Equal(now.Add(time.Second)) {
+		t.Fatalf("paused until %s", paused.Sub(now))
+	}
+}
+
+func TestInFlightCurvePassWaitsForPumpAMMFees(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": vol5m(8000)}, fees: map[string]float64{"R": 4}}
+	g := New(Config{MinVolume5m: 5000, Retry: time.Second, MinFeesSOL: 1}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	curve := domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now.Add(-time.Minute)}
+	g.NoteMigration(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm"})
+	var got domain.Token
+	g.ask(context.Background(), []*item{{token: curve, born: curve.CreatedAt}}, func(tok domain.Token) { got = tok }, nil)
+	if got.Mint != "" {
+		t.Fatalf("admitted before fees: %+v", got)
+	}
+	g.wave(context.Background(), func(tok domain.Token) { got = tok })
+	if got.Pool != "amm" || got.Dex != "Pump AMM" || got.EntryVolume.USD5m != 8000 || len(q.feePools) != 1 || q.feePools[0] != "amm" || q.calls != 1 {
+		t.Fatalf("got %+v pools %v volume calls %d", got, q.feePools, q.calls)
+	}
+}
+
+func TestInFlightPassBecomesAFeeCheckWhenTheNewPairIsQueued(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": vol5m(8000)}, fees: map[string]float64{"R": 4}}
+	g := New(Config{MinVolume5m: 5000, Retry: time.Second, MinFeesSOL: 1}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	curve := domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump V1", Pool: "curve", CreatedAt: now.Add(-time.Minute)}
+	amm := domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm"}
+	g.NoteMigration(amm)
+	g.ScreenPair(amm)
+	var got domain.Token
+	g.ask(context.Background(), []*item{{token: curve, born: curve.CreatedAt}}, func(tok domain.Token) { got = tok }, nil)
+	if got.Mint != "" {
+		t.Fatalf("curve pass emitted before fees: %+v", got)
+	}
+	g.mu.Lock()
+	it := g.pending["R"]
+	n := len(g.pending)
+	g.mu.Unlock()
+	if n != 1 || it == nil || !it.feesOnly || it.held.USD5m != 8000 || it.token.Pool != "amm" {
+		t.Fatalf("pending n=%d %+v", n, it)
+	}
+	g.wave(context.Background(), func(tok domain.Token) { got = tok })
+	if got.Pool != "amm" || got.EntryVolume.USD5m != 8000 || q.calls != 1 {
+		t.Fatalf("got %+v volume calls %d", got, q.calls)
+	}
+	g.ScreenPair(amm)
+	g.mu.Lock()
+	_, again := g.pending["R"]
+	g.mu.Unlock()
+	if again {
+		t.Fatal("a pool that cleared fees was screened again")
+	}
+}
+
+func TestFeeRejectionStaysClosedForThatPool(t *testing.T) {
+	q := &fakeQ{limit: 10, vols: map[string]domain.Volume{"R": vol5m(8000)}, fees: map[string]float64{"R": 0.4}}
+	g := New(Config{MinVolume5m: 5000, Retry: time.Second, MinFeesSOL: 1}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	g.Add(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm", CreatedAt: now.Add(-time.Minute)})
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("emitted before fees") })
+	g.wave(context.Background(), func(domain.Token) { t.Fatal("low fees were admitted") })
+	before := g.Health().Dropped
+	g.ScreenPair(domain.Token{Mint: "R", Symbol: "RODNEY", Dex: "Pump AMM", Pool: "amm"})
+	g.mu.Lock()
+	_, pending := g.pending["R"]
+	g.mu.Unlock()
+	if pending || g.Health().Dropped != before || before != 1 {
+		t.Fatalf("pending=%v dropped %d -> %d", pending, before, g.Health().Dropped)
+	}
+}
+
+// laterBook is past the volume window: watched, with no volume samples.
+type laterBook struct{ memBook }
+
+func (b *laterBook) Tokens() []domain.Token       { return append([]domain.Token(nil), b.tokens...) }
+func (b *laterBook) VolumeTokens() []domain.Token { return nil }
+
+func TestWatchedPumpAMMFeesInAnyTier(t *testing.T) {
+	q := &fakeQ{fees: map[string]float64{"low": 0.2, "high": 2}}
+	g := New(Config{MinVolume5m: 5000, Recheck: 30 * time.Second, Retry: time.Second, MinFeesSOL: 1}, q, quiet())
+	now := time.Now()
+	g.now = func() time.Time { return now }
+	book := &laterBook{}
+	for _, mint := range []string{"low", "high", "down"} {
+		amm := domain.Token{Mint: mint, Dex: "Pump AMM", Pool: "amm-" + mint}
+		book.tokens = append(book.tokens, amm)
+		g.NoteMigration(amm)
+		g.ResetStreak(mint)
+	}
+	drain := func() {
+		for {
+			it, _, recheck := g.next(now, book)
+			if recheck {
+				t.Fatal("tier 4 read volume")
+			}
+			if it == nil {
+				return
+			}
+			g.ask(context.Background(), []*item{it}, func(domain.Token) { t.Fatal("a watched token was admitted again") }, book)
+		}
+	}
+	drain()
+	if book.has("low") || !book.has("high") || !book.has("down") || q.feeCalls != 3 || q.calls != 0 {
+		t.Fatalf("low=%v high=%v down=%v fees=%d volume=%d", book.has("low"), book.has("high"), book.has("down"), q.feeCalls, q.calls)
+	}
+	now = now.Add(time.Second)
+	q.fees["down"] = 0.5
+	drain()
+	if book.has("down") || q.feeCalls != 4 {
+		t.Fatalf("down after retry=%v fees=%d", book.has("down"), q.feeCalls)
+	}
+	g.ResetStreak("high")
+	drain()
+	if q.feeCalls != 4 {
+		t.Fatalf("a pass was asked again: %d", q.feeCalls)
+	}
+	if h := g.Health(); h.Tokens != 0 || h.Dropped != 0 || h.Passed != 0 {
+		t.Fatalf("watched fee answers counted as screens: %+v", h)
+	}
 }

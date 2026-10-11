@@ -141,16 +141,27 @@ axiom:
 screen:
   after: 10s
   min_volume_5m: 5000           # USD, buys + sells over Axiom's 5m window
+  # Pump AMM only, once the 5-minute volume has cleared. Global fees paid
+  # (totalPairFeesPaid, SOL) must be above this. pairAddress is the pool.
+  # GET api.axiom.trade/token-info-v2?pairAddress=<pool>&v=<unix ms>
+  # Asked once. Axiom not answering is asked again and does not re-read volume.
+  # 0 turns the check off. Pump V1 is not asked. Rules: TOKEN_TIERS.md.
+  min_fees_sol: 1
   recheck: 30s
   no_volume_for: 2m
   proxies: ./proxies.txt
 
 watch:
-  # From the moment the token enters tier 1: 10m + 30m + 1h + 48h.
+  # From the moment the token enters tier 1: 10m + 10m + 40m + 48h50m.
   lifetime: 49h50m
-  # Pair volume is checked only until tier 4, which starts at 1h50m.
+  # Pair volume is checked for this long after entering tier 1.
+  # Tier 4 starts at 1h, so the first 50m of tier 4 are still checked.
   volume_for: 110m
   min_theses: 3                 # alert when the token has this many theses
+  # Still 0 theses this long after entering tier 1: remove for good.
+  # A fomo error is not a zero. A Pump AMM migration does not bring it back.
+  # Rules: TOKEN_TIERS.md.
+  no_thesis_for: 25m
   thesis_limit: 500             # one sortedThesis page; 500 is the API cap so the window comes back whole
   schedule:                     # age is time since tier 1, not since the token was created
     - {max_age: 10m, every: 3s}

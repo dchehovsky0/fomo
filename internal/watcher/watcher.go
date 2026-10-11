@@ -72,7 +72,10 @@ type Config struct {
 	VolumeFor time.Duration
 	// MinTheses is the first alert. The token stays watched; later alerts
 	// go out at twice, four times, eight times this count.
-	MinTheses   int
+	MinTheses int
+	// NoThesisFor: still 0 theses this long after entering tier 1, and the
+	// token is removed for good. A fomo error is not a zero. Zero turns it off.
+	NoThesisFor time.Duration
 	ThesisLimit int
 	Schedule    []Tier
 	RetryDelay  time.Duration
@@ -91,6 +94,8 @@ type Stats struct {
 	Signals    atomic.Int64
 	SendErrors atomic.Int64
 	Expired    atomic.Int64
+	// NoThesis counts tokens removed because they stayed at 0 theses.
+	NoThesis atomic.Int64
 	// CheckNanos / CheckSamples time a finished thesis check, including the
 	// wait for a token and the rate limit, up to the fomo response.
 	CheckNanos   atomic.Int64
@@ -105,7 +110,10 @@ type item struct {
 	count  int
 	// notified is the last rung we sent: 0, then MinTheses, then double that.
 	// The next alert waits for twice this value.
-	notified     int
+	notified int
+	// hadThesis is set once a fomo answer showed at least one thesis.
+	// A later empty answer does not take the token off for good.
+	hadThesis    bool
 	gone         bool
 	addedAt      time.Time
 	tierMu       sync.Mutex
@@ -126,7 +134,7 @@ type item struct {
 	seenAt time.Time
 	image  string
 	// volume is the latest Axiom pair volume. It starts as the entry
-	// sample and moves on each recheck while the token is still in tiers 1–3.
+	// sample and moves on each recheck while the token is still inside the volume window.
 	volume   domain.Volume
 	volumeAt time.Time
 	// fomoMS is how long the last fomo request for this token took.
@@ -163,12 +171,15 @@ type Watcher struct {
 	// dismissed is a mint taken off the board by hand. A later migration
 	// does not put it back. A volume drop is not in this set.
 	dismissed map[string]struct{}
-	queue     itemHeap
-	lagSum    time.Duration
-	lagN      int
-	lagMax    time.Duration
-	wake      chan struct{}
-	delays    []Delay
+	// quiet is a mint removed because it stayed at 0 theses. A later
+	// migration does not put it back. A volume drop is not in this set.
+	quiet  map[string]struct{}
+	queue  itemHeap
+	lagSum time.Duration
+	lagN   int
+	lagMax time.Duration
+	wake   chan struct{}
+	delays []Delay
 }
 
 func New(cfg Config, accounts []Account, n Notifier, st Store, log *slog.Logger) *Watcher {
@@ -187,7 +198,8 @@ func New(cfg Config, accounts []Account, n Notifier, st Store, log *slog.Logger)
 		perAcc: make([]atomic.Int64, len(accounts)),
 		gap:    queueGap(cfg.Schedule),
 		items:  map[string]*item{}, migrated: map[string]domain.Token{},
-		dismissed: map[string]struct{}{}, wake: make(chan struct{}, 1),
+		dismissed: map[string]struct{}{}, quiet: map[string]struct{}{},
+		wake: make(chan struct{}, 1),
 	}
 }
 
@@ -221,6 +233,12 @@ func (w *Watcher) Add(l domain.Token) {
 			"token", l.Mint, "ticker", l.Symbol)
 		return
 	}
+	if _, off := w.quiet[l.Mint]; off {
+		w.mu.Unlock()
+		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "нет тезисов, снят навсегда",
+			"token", l.Mint, "ticker", l.Symbol)
+		return
+	}
 	w.mu.Unlock()
 	it := &item{
 		l: l, due: now, addedAt: now,
@@ -228,6 +246,11 @@ func (w *Watcher) Add(l domain.Token) {
 	}
 	if sig, ok := w.store.Signal(l.Mint); ok {
 		it.notified = rungReached(w.cfg.MinTheses, sig)
+		// A stored alert is a thesis this process may not have seen yet.
+		// An empty answer must not remove that token for good.
+		if it.notified > 0 {
+			it.hadThesis = true
+		}
 	}
 	if l.EntryVolume != (domain.Volume{}) {
 		it.volumeAt = now
@@ -247,6 +270,12 @@ func (w *Watcher) Add(l domain.Token) {
 	if _, off := w.dismissed[l.Mint]; off {
 		w.mu.Unlock()
 		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "токен убрали с доски",
+			"token", l.Mint, "ticker", l.Symbol)
+		return
+	}
+	if _, off := w.quiet[l.Mint]; off {
+		w.mu.Unlock()
+		w.log.Info("flow", "step", "обработали", "decision", "пропуск", "why", "нет тезисов, снят навсегда",
 			"token", l.Mint, "ticker", l.Symbol)
 		return
 	}
@@ -374,6 +403,14 @@ func (w *Watcher) NoteMigration(l domain.Token) bool {
 	return true
 }
 
+// Quiet reports a mint removed because it stayed at 0 theses.
+func (w *Watcher) Quiet(mint string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, ok := w.quiet[mint]
+	return ok
+}
+
 // Dismissed reports a mint taken off the board by hand.
 func (w *Watcher) Dismissed(mint string) bool {
 	w.mu.Lock()
@@ -405,8 +442,8 @@ func (w *Watcher) Retarget(l domain.Token) bool {
 }
 
 // ReopenDropped marks a mint that left on volume as watched again, so Add
-// can take it. Alerted and expired rows stay as they are. False means there
-// is nothing to reopen.
+// can take it. A no-thesis removal, a hand removal and an expired row stay
+// as they are. False means there is nothing to reopen.
 func (w *Watcher) ReopenDropped(mint string) bool {
 	if w.tiers == nil {
 		return false
@@ -584,6 +621,48 @@ func (w *Watcher) drop(it *item) {
 	w.mu.Unlock()
 }
 
+// silence takes the token off for good: no later tier, and a Pump AMM
+// migration does not put it back. False means it already left the list.
+func (w *Watcher) silence(it *item, at time.Time) bool {
+	w.mu.Lock()
+	if it.gone || w.items[it.l.Mint] != it {
+		w.mu.Unlock()
+		return false
+	}
+	w.quiet[it.l.Mint] = struct{}{}
+	it.gone = true
+	delete(w.items, it.l.Mint)
+	if it.idx >= 0 {
+		heap.Remove(&w.queue, it.idx)
+	}
+	w.mu.Unlock()
+	w.noteTier(it, at)
+	w.markStatus(it.l.Mint, "no_thesis", at)
+	return true
+}
+
+// zeroTooLong reports that this answer is still empty and the token has
+// been watched for NoThesisFor. A thesis seen earlier keeps it.
+func (w *Watcher) zeroTooLong(it *item, now time.Time) bool {
+	limit := w.cfg.NoThesisFor
+	if limit <= 0 {
+		return false
+	}
+	w.mu.Lock()
+	had := it.hadThesis || it.notified > 0
+	w.mu.Unlock()
+	if had {
+		return false
+	}
+	return w.inWork(it, now) >= limit
+}
+
+func (w *Watcher) noteHadThesis(it *item) {
+	w.mu.Lock()
+	it.hadThesis = true
+	w.mu.Unlock()
+}
+
 // check runs one request for the item and decides what happens to it next.
 // A failure of the account itself (no login, rejected token, dead proxy)
 // hands the item straight to the other accounts and returns how long this
@@ -665,6 +744,13 @@ func (w *Watcher) check(ctx context.Context, acc int, it *item) (time.Duration, 
 	// publishPage is the only checks++ for this answer. The board reads it
 	// under mu, and the log below runs after that write.
 	w.publishPage(it, page, seen)
+	if seenN > 0 {
+		w.noteHadThesis(it)
+	} else if w.zeroTooLong(it, finished) && w.silence(it, finished) {
+		w.Stats.NoThesis.Add(1)
+		w.logCheck(acc, it, took, lag, "no_thesis", seenN, 0, nil, page)
+		return 0, nil
+	}
 
 	if rung := nextRung(w.notifiedOf(it), w.cfg.MinTheses); rung > 0 && seenN >= rung {
 		if w.finished(it) {
@@ -749,6 +835,8 @@ func (w *Watcher) logCheck(acc int, it *item, took, lag time.Duration, result st
 		alert, why = "собираем", "тезисов достаточно"
 	case "expired":
 		why = "срок наблюдения вышел"
+	case "no_thesis":
+		why = "за отведённое время ни одного тезиса"
 	case "auth":
 		why = "аккаунт не пустил, токен уйдёт другому"
 	case "retry":
@@ -1091,8 +1179,9 @@ func (w *Watcher) inWork(it *item, now time.Time) time.Duration {
 	return now.Sub(start)
 }
 
-// VolumeTokens are the tokens still in tiers 1–3, the ones whose pair volume
-// is still checked. Tier 4 is past VolumeFor and is left out.
+// VolumeTokens are the tokens still inside VolumeFor after entering tier 1.
+// Past that, pair volume is not checked. Tier 4 starts earlier, so its first
+// stretch is still included.
 func (w *Watcher) VolumeTokens() []domain.Token {
 	now := w.now()
 	w.mu.Lock()

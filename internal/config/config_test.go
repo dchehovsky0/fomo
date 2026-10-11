@@ -23,8 +23,14 @@ func TestLoadRepoConfigWithEnv(t *testing.T) {
 	if cfg.Telegram.BotToken != "123456:ABC-def" || cfg.Telegram.ChatID != "-1001234567890" {
 		t.Errorf("telegram = %+v", cfg.Telegram)
 	}
-	if cfg.Watch.Lifetime != 49*time.Hour+50*time.Minute || cfg.Watch.VolumeFor != 110*time.Minute || cfg.Watch.MinTheses != 3 || cfg.Watch.ThesisLimit != 500 || len(cfg.Watch.Schedule) != 4 || cfg.Watch.Schedule[0].Every != 2*time.Second || cfg.Watch.Schedule[0].MaxAge != 20*time.Minute || cfg.Watch.Schedule[3].Every != 2*time.Minute || cfg.Screen.After != 10*time.Second || cfg.Screen.MinVolume5m != 1000 || cfg.Screen.NoVolumeFor != 2*time.Minute || cfg.Screen.Recheck != 30*time.Second {
+	if cfg.Watch.Lifetime != 49*time.Hour+50*time.Minute || cfg.Watch.VolumeFor != 110*time.Minute || cfg.Watch.MinTheses != 3 || cfg.Watch.ThesisLimit != 500 || len(cfg.Watch.Schedule) != 4 || cfg.Watch.Schedule[0].Every != 3*time.Second || cfg.Watch.Schedule[0].MaxAge != 10*time.Minute || cfg.Watch.Schedule[1].MaxAge != 20*time.Minute || cfg.Watch.Schedule[1].Every != 7*time.Second || cfg.Watch.Schedule[2].MaxAge != 60*time.Minute || cfg.Watch.Schedule[3].Every != 2*time.Minute || cfg.Screen.After != 10*time.Second || cfg.Screen.MinVolume5m != 5000 || cfg.Screen.NoVolumeFor != 2*time.Minute || cfg.Screen.Recheck != 30*time.Second {
 		t.Errorf("watch not parsed: %+v", cfg.Watch)
+	}
+	if cfg.Watch.NoThesisFor != 25*time.Minute {
+		t.Errorf("no_thesis_for = %s", cfg.Watch.NoThesisFor)
+	}
+	if cfg.Screen.MinFeesSOL != 1 {
+		t.Errorf("min_fees_sol = %v", cfg.Screen.MinFeesSOL)
 	}
 	if ax := cfg.Axiom; ax.RefreshToken != "refresh" || len(ax.Clusters) != 4 || ax.StallTimeout != 3*time.Minute ||
 		ax.ProfileDir != filepath.Join("..", "..", "axiom-profile") ||
